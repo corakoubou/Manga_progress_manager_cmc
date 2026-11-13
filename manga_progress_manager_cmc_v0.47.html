@@ -1,0 +1,2220 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>漫画進捗管理ツール v0.47</title>
+<style>
+:root{
+  --bg:#111214;--panel:#191b1f;--panel2:#22252b;--panel3:#15171a;
+  --line:#383d46;--text:#f3f4f6;--muted:#9ca3af;--ok:#6fd38a;
+  --ng:#e06b6b;--warn:#d8b15e;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:"Segoe UI","Yu Gothic UI","Meiryo",sans-serif;
+  overflow:hidden;font-size:14px
+}
+button,input,select,textarea{font:inherit}
+button{
+  background:#292d34;color:var(--text);border:1px solid var(--line);
+  border-radius:6px;padding:8px 12px;cursor:pointer
+}
+button:hover{background:#333842}
+button.primary{background:#f4f4f5;color:#111;font-weight:700;border-color:#f4f4f5}
+input,select,textarea{
+  width:100%;background:#111317;color:var(--text);border:1px solid var(--line);
+  border-radius:6px;padding:8px;outline:none
+}
+textarea{resize:vertical;min-height:150px}
+input:focus,select:focus,textarea:focus{border-color:#767e89}
+input[readonly]{
+  background:#1a1d22;color:#d5d9df;border-color:#30353d;cursor:default
+}
+header{
+  height:58px;display:flex;align-items:center;gap:8px;padding:8px 12px;
+  border-bottom:1px solid var(--line);background:var(--panel3)
+}
+.brand{font-size:17px;font-weight:800;margin-right:10px;white-space:nowrap}
+.small{font-size:12px;color:var(--muted)}
+.spacer{flex:1}
+input[type=file]{display:none}
+.app{
+  --editor-width:520px;
+  height:calc(100vh - 58px);
+  display:grid;
+  grid-template-columns:minmax(520px,1fr) 8px var(--editor-width);
+  gap:0;padding:8px
+}
+.panel{
+  background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  overflow:hidden;display:flex;flex-direction:column;min-height:0
+}
+.app > .panel:first-child{margin-right:4px}
+.app > .panel:last-child{margin-left:4px}
+.paneSplitter{position:relative;cursor:col-resize;user-select:none;touch-action:none}
+.paneSplitter::before{
+  content:"";position:absolute;top:8px;bottom:8px;left:3px;width:2px;
+  border-radius:999px;background:#3a3f48
+}
+.paneSplitter:hover::before,.paneSplitter.dragging::before{
+  left:2px;width:4px;background:#8b929d
+}
+body.resizingPanes{cursor:col-resize!important;user-select:none!important}
+body.resizingPanes *{cursor:col-resize!important}
+
+.head{
+  min-height:44px;display:flex;align-items:center;gap:8px;padding:8px 10px;
+  border-bottom:1px solid var(--line);background:#1d2025;font-weight:700
+}
+.body{padding:10px;overflow:auto;min-height:0}
+.summary{
+  display:grid;grid-template-columns:repeat(5,minmax(100px,1fr));gap:7px;margin-bottom:10px
+}
+.stat{
+  background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:8px
+}
+.stat .v{font-size:19px;font-weight:800;margin-top:2px}
+.notice{
+  border:1px solid #514b37;background:#242116;color:#dacb91;
+  border-radius:7px;padding:8px 9px;font-size:12px;line-height:1.6;margin-bottom:10px
+}
+.toolbar{
+  display:grid;grid-template-columns:minmax(180px,1fr) 140px 130px;gap:7px;margin-bottom:10px
+}
+.workFilterBox{
+  display:flex;align-items:center;flex-wrap:wrap;gap:6px;
+  border:1px solid var(--line);background:#17191d;border-radius:7px;
+  padding:7px 8px;margin-bottom:10px
+}
+.workFilterTitle{
+  font-size:12px;color:var(--muted);font-weight:700;margin-right:3px
+}
+.workFilterItem{
+  display:inline-flex;align-items:center;gap:5px;
+  border:1px solid var(--line);background:#22252b;border-radius:6px;
+  padding:5px 7px;cursor:pointer;user-select:none;font-size:12px
+}
+.workFilterItem:has(input:checked){
+  border-color:#9097a2;background:#303640
+}
+.workFilterItem input{width:auto;margin:0}
+.workFilterClear{
+  width:auto;padding:5px 8px;font-size:11px;margin-left:auto
+}
+.pageGrid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(170px,1fr));
+  gap:10px;align-items:start
+}
+.pageCard{
+  background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+  overflow:hidden;cursor:pointer;transition:.08s
+}
+.pageCard:hover{transform:translateY(-1px);border-color:#59606b}
+.pageCard.active{outline:2px solid #eee;outline-offset:-2px}
+.pageCard.missing{border-color:#684545}
+.thumb{
+  aspect-ratio:1240/1754;background:#0b0c0e;display:flex;align-items:center;
+  justify-content:center;overflow:hidden;position:relative
+}
+.thumb img{width:100%;height:100%;object-fit:contain;background:#fff}
+
+/* ステータスごとのプレビュー色 */
+.thumb::after{
+  content:"";
+  position:absolute;inset:0;
+  pointer-events:none;
+  background:transparent;
+  transition:background .12s ease;
+}
+
+.thumb .loading,.thumb .err{font-size:12px;color:var(--muted);padding:12px;text-align:center}
+.thumb .err{color:#df8d8d}
+.pageLabel{
+  display:flex;align-items:center;gap:6px;padding:8px 8px 5px;font-weight:800
+}
+.pageLabel .pct{margin-left:auto;font-size:12px}
+.fileName{
+  color:var(--muted);font-size:11px;padding:0 8px 8px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+}
+
+/* ページ番号・進捗率・工程・ファイル名がある下部領域のステータス色 */
+.pageCard.status-working{border-color:#506b86}
+
+.pageCard.status-notstarted .pageLabel,
+.pageCard.status-notstarted .workChips,
+.pageCard.status-notstarted .fileName{background:#343840}
+
+.pageCard.status-working .pageLabel,
+.pageCard.status-working .workChips,
+.pageCard.status-working .fileName{background:#354f69}
+
+.pageCard.status-done .pageLabel,
+.pageCard.status-done .workChips,
+.pageCard.status-done .fileName{background:#31563b}
+
+.pageCard.status-hold .pageLabel,
+.pageCard.status-hold .workChips,
+.pageCard.status-hold .fileName{background:#613b3b}
+
+.pageCard .fileName{color:#d9dde3}
+
+.workChips{
+  display:flex;flex-wrap:wrap;gap:4px;padding:0 8px 7px
+}
+.workChip{
+  display:inline-flex;align-items:center;gap:4px;
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(0,0,0,.22);border-radius:999px;
+  padding:2px 6px;font-size:10px;color:#f0f2f4
+}
+.workChip .chipPct{color:#c6cbd2}
+
+.workTable{display:flex;flex-direction:column;gap:6px}
+.workRow{
+  display:grid;grid-template-columns:34px minmax(130px,1fr) 100px 32px;
+  gap:8px;align-items:center;border:1px solid var(--line);
+  background:#17191d;border-radius:7px;padding:7px 8px
+}
+.workRow.active{border-color:#7b828e;background:#20242a}
+.workCheck{display:flex;align-items:center;justify-content:center}
+.workCheck input{width:auto;transform:scale(1.12)}
+.workName{font-weight:700}
+.workProgressWrap input{text-align:right;padding:6px}
+.workPct{font-size:12px;color:var(--muted)}
+.workMiniBar{
+  grid-column:2 / 5;height:5px;background:#0d0f12;border-radius:999px;overflow:hidden
+}
+.workMiniBar > div{height:100%;background:#d8dadd;width:0}
+.overallProgressBox{
+  border:1px solid var(--line);background:#17191d;border-radius:7px;padding:8px
+}
+.overallProgressValue{font-size:20px;font-weight:800;margin-bottom:6px}
+.detailInfo{
+  margin-top:14px;border-top:1px solid var(--line);padding-top:10px;color:var(--muted)
+}
+.detailInfo summary{
+  cursor:pointer;font-size:12px;user-select:none;margin-bottom:8px
+}
+.detailInfo .infoBox{margin:0;color:var(--muted)}
+
+.badge{
+  position:absolute;top:6px;right:6px;background:rgba(15,17,20,.88);
+  border:1px solid #4a5059;border-radius:999px;padding:3px 6px;font-size:10px
+}
+.empty{padding:35px;text-align:center;color:var(--muted);line-height:1.8}
+.field{margin-bottom:10px}
+.field label{display:block;font-size:12px;color:#c7cbd1;margin-bottom:4px}
+.infoBox{
+  border:1px solid var(--line);background:#17191d;border-radius:7px;
+  padding:9px;margin-bottom:10px;font-size:12px;line-height:1.6
+}
+/* 選択ページ: 左にサムネ、右に進捗入力 */
+.editorSideBySide{display:grid;grid-template-columns:minmax(0,45fr) minmax(0,55fr);gap:12px;align-items:start}
+.editorInputs{min-width:0}
+.editorSideBySide .selectedPreview{position:sticky;top:10px;margin-bottom:0;min-width:0;min-height:180px}
+.editorInputs .grid2{grid-template-columns:repeat(2,minmax(0,1fr))}
+@container (max-width: 500px){.editorSideBySide{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.editorInputs .grid2{grid-template-columns:minmax(0,1fr)}}
+.selectedPreview{
+  background:#0c0d0f;border:1px solid var(--line);border-radius:7px;
+  min-height:260px;display:flex;align-items:center;justify-content:center;
+  overflow:auto;margin-bottom:10px
+}
+.selectedPreview img{
+  display:block;width:100%;height:auto;
+  max-width:none;max-height:none;object-fit:contain;background:white
+}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.progressOuter{
+  height:9px;border-radius:999px;background:#0d0f12;border:1px solid #30343b;overflow:hidden
+}
+.progressInner{height:100%;background:#dedede;width:0}
+.statusLine{font-size:11px;color:var(--muted);margin-top:5px}
+.okText{color:var(--ok)}.ngText{color:var(--ng)}
+.hidden{display:none!important}
+
+.modeBtn.active{
+  background:#e9eaec;color:#111;border-color:#e9eaec;font-weight:800
+}
+.statsPage{
+  height:calc(100vh - 58px);padding:8px;overflow:auto
+}
+.statsShell{
+  max-width:1500px;margin:0 auto;background:var(--panel);
+  border:1px solid var(--line);border-radius:8px;padding:14px
+}
+.statsTop{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:14px
+}
+.statsCard{
+  border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:12px
+}
+.statsCard .label{font-size:12px;color:var(--muted);margin-bottom:5px}
+.statsCard .value{font-size:27px;font-weight:900}
+.statsSectionTitle{
+  font-size:16px;font-weight:800;margin:16px 0 9px
+}
+.workStatsGrid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:9px
+}
+.workStatCard{
+  border:1px solid var(--line);background:#181b20;border-radius:8px;padding:11px
+}
+.workStatTitle{font-size:15px;font-weight:800;margin-bottom:9px}
+.workStatMain{
+  display:flex;align-items:end;justify-content:space-between;gap:12px;
+  border-bottom:1px solid var(--line);padding-bottom:9px;margin-bottom:9px
+}
+.workStatRemain{font-size:28px;font-weight:900}
+.workStatRemain small{font-size:12px;color:var(--muted);font-weight:500}
+.workStatRows{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.workStatMini{
+  background:#111317;border:1px solid #30343b;border-radius:6px;padding:7px
+}
+.workStatMini .k{font-size:11px;color:var(--muted)}
+.workStatMini .v{font-size:17px;font-weight:800;margin-top:2px}
+.statsBar{
+  height:7px;background:#0d0f12;border:1px solid #30343b;border-radius:999px;
+  overflow:hidden;margin-top:9px
+}
+.statsBar > div{height:100%;background:#d8dadd;width:0}
+.statsEmpty{padding:60px;text-align:center;color:var(--muted)}
+
+
+.thumbOnlyPage{height:calc(100vh - 58px);padding:8px;overflow:hidden}
+.thumbOnlyShell{height:100%;display:flex;flex-direction:column;min-height:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.thumbOnlyToolbar{display:flex;align-items:center;gap:10px;padding:9px 11px;border-bottom:1px solid var(--line);background:var(--panel2);flex:0 0 auto}
+.thumbOnlyToolbar label{font-size:12px;color:var(--muted);white-space:nowrap}
+.thumbOnlyToolbar input[type="range"]{width:260px;padding:0;border:0;background:transparent}
+.thumbOnlySizeValue{min-width:54px;font-size:12px;font-weight:700}
+.thumbOnlyScroller{flex:1;min-height:0;overflow:auto;padding:12px}
+.thumbOnlyRow{display:flex;flex-wrap:nowrap;align-items:flex-start;gap:10px;width:max-content;min-width:100%}
+.thumbOnlyCard{flex:0 0 var(--thumb-only-width,180px);width:var(--thumb-only-width,180px);border:1px solid var(--line);border-radius:7px;overflow:hidden;background:#15171b;cursor:pointer}
+.thumbOnlyCard.active{outline:2px solid #d7dbe1;outline-offset:1px}
+.thumbOnlyImage{width:100%;aspect-ratio:1240/1754;background:#0b0c0e;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.thumbOnlyImage img{width:100%;height:100%;object-fit:contain;background:white}
+.thumbOnlyMeta{padding:7px 8px;font-size:12px;font-weight:800;display:flex;justify-content:space-between;gap:6px}
+.thumbOnlyCard.status-notstarted .thumbOnlyMeta{background:#343840}
+.thumbOnlyCard.status-working .thumbOnlyMeta{background:#354f69}
+.thumbOnlyCard.status-done .thumbOnlyMeta{background:#31563b}
+.thumbOnlyCard.status-hold .thumbOnlyMeta{background:#613b3b}
+.thumbOnlyEmpty{padding:40px;color:var(--muted)}
+.comicReader{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:12px;overflow:hidden}
+.comicSpread{display:flex;flex-direction:row;align-items:stretch;justify-content:center;width:min(100%, calc(var(--comic-page-width, 360px) * 2));aspect-ratio:1.414 / 1;max-height:100%;flex:0 1 auto;min-height:0;gap:0}
+.comicPage{width:50%;max-width:50%;min-width:0;background:#101114;border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden}
+.comicPage:first-child{border-right:0}
+.comicPage{position:relative;flex-direction:row!important;align-items:stretch!important;justify-content:stretch!important}
+.comicPage .comicImageArea{min-width:0;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
+.comicPage .comicImageArea img{max-width:100%;max-height:calc(100% - 28px)}
+.comicPage .comicNoteArea{width:36%;min-width:105px;max-width:none;flex-shrink:0;display:flex;flex-direction:column;gap:4px;padding:6px;background:#22262c;cursor:text}
+.comicPage .comicNoteArea label{font-size:11px;color:#aeb9c7;text-align:center}
+.comicPage .comicNoteArea textarea{flex:1;min-height:0;width:100%;height:100%;box-sizing:border-box;resize:none;border:1px solid #49515c;border-radius:4px;background:#191c22;color:#e8edf5;padding:7px 5px;font-size:13px;line-height:1.5;overflow:auto;white-space:pre-wrap}
+.comicPage .comicNoteArea textarea:focus{outline:1px solid #7db8ed}
+body.thumbUiHidden .comicPage .comicNoteArea{background:#22262c}
+
+.comicPage:hover{background:#22262d}
+.comicPage img{display:block;max-width:100%;max-height:calc(100% - 28px);height:auto;width:auto;object-fit:contain}
+.comicPage .comicLabel{font-size:12px;color:var(--muted);padding:5px}
+.comicControls{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
+.comicControls input{width:85px;text-align:center}
+.comicControls button:disabled{opacity:.35;cursor:default}
+/* Tabキーでサムネ閲覧UIを一時的に非表示 */
+body.thumbUiHidden > header, body.thumbUiHidden .thumbOnlyToolbar,
+body.thumbUiHidden .comicControls{display:none!important}
+body.thumbUiHidden .thumbOnlyPage{height:100dvh;padding:0}
+body.thumbUiHidden .thumbOnlyShell{border:0;border-radius:0}
+body.thumbUiHidden .comicReader{padding:0;gap:0}
+body.thumbUiHidden .comicPage .comicLabel{display:none}
+body.thumbUiHidden .comicPage img{max-height:100%}
+
+@media(max-width:1100px){
+  body{overflow:auto}
+  .app{height:auto;grid-template-columns:1fr;gap:8px}
+  .paneSplitter{display:none}
+  .app > .panel:first-child,.app > .panel:last-child{margin:0}
+  .panel{min-height:500px}
+}
+
+.orderGrid{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));align-content:start;gap:12px;padding:16px}
+.orderCard{position:relative;border:1px solid var(--line);background:#1a1d22;border-radius:7px;padding:7px;cursor:grab;user-select:none}
+.orderCard:active{cursor:grabbing}
+.orderCard.dragging{opacity:.35}
+.orderCard.dropTarget{outline:3px solid #7db8ed;outline-offset:2px}
+.orderCard img{display:block;width:100%;height:190px;object-fit:contain;background:#101114}
+.orderCard .orderMeta{display:flex;justify-content:space-between;gap:4px;margin-top:6px;font-size:12px;color:#cdd4df}
+.orderCard .orderPosition{font-weight:bold;color:#9bd0ff}
+/* 拡大時はページ幅を維持し、画面からはみ出した分をスクロール可能にする */
+.comicReader{overflow:auto;align-items:safe center;justify-content:safe center}
+.comicSpread{width:calc(var(--comic-page-width, 360px) * 2);max-width:none;max-height:none;flex:0 0 auto}
+
+/* コミックのサイズ指定は画像幅のみ。メモ・操作ボタンは拡大しない。 */
+.comicReader{overflow:auto;align-items:safe center;justify-content:safe center}
+.comicSpread{
+  width:calc((var(--comic-page-width, 360px) + 425px) * 2);
+  min-width:calc((var(--comic-page-width, 360px) + 425px) * 2);
+  max-width:none;max-height:none;
+  height:calc(var(--comic-page-width, 360px) * 1.414 + 34px);
+  aspect-ratio:auto;flex:0 0 auto;
+}
+.comicPage{width:calc(var(--comic-page-width, 360px) + 425px);min-width:0;max-width:none;flex:0 0 auto}
+.comicPage .comicNoteArea{width:425px;min-width:425px;max-width:425px;flex:0 0 425px}
+.comicPage .comicImageArea{width:var(--comic-page-width, 360px);min-width:var(--comic-page-width, 360px);flex:0 0 var(--comic-page-width, 360px)}
+.comicPage .comicImageArea img{max-width:100%;max-height:calc(100% - 28px)}
+
+.recordCompare{overflow:auto;flex:1;min-height:0;padding:14px}
+.recordSectionTitle{font-size:14px;font-weight:700;margin:8px 0}
+.recordStrip{display:flex;gap:10px;overflow-x:auto;min-height:240px;padding:8px 0 18px;border-bottom:1px solid #424852}
+.recordTile{flex:0 0 170px;width:170px;display:flex;flex-direction:column;gap:5px;text-align:center}
+.recordTile img,.recordMissing{width:170px;height:220px;object-fit:contain;background:#101114;border:1px solid #444}
+.recordMissing{display:flex;align-items:center;justify-content:center;padding:12px;font-size:12px;color:#c6cbd4;box-sizing:border-box;white-space:normal}
+.recordTile small{font-size:11px;color:#aeb8c5;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">漫画進捗管理ツール <span class="small">v0.47</span></div>
+  <button id="modeManage" class="modeBtn active">進捗管理</button>
+  <button id="modeStats" class="modeBtn">統計</button>
+  <button id="modeThumbs" class="modeBtn">サムネ一覧</button>
+  <button id="modeOrder" class="modeBtn">順番変更メーカー</button>
+  <button id="modeRecord" class="modeBtn">ページレコーディング</button>
+  <button id="pickFolder" class="primary">作品フォルダーを選択</button>
+  <button id="reloadFolder">再読み込み</button>
+  <input id="folderInput" type="file" webkitdirectory multiple>
+  <button id="exportProgress">進捗JSON出力</button>
+  <button id="importProgress">進捗JSON読込</button>
+  <input id="progressInput" type="file" accept=".json,application/json">
+  <div class="spacer"></div>
+  <span id="projectStatus" class="small">作品未読込</span>
+</header>
+
+<main class="app" id="manageMode">
+  <section class="panel">
+    <div class="head">
+      <span>ページ管理</span>
+      <div class="spacer"></div>
+      <span id="cmcStatus" class="small">CMC未読込</span>
+    </div>
+    <div class="body">
+      <div class="summary">
+        <div class="stat"><div class="small">総ページ</div><div class="v" id="sumPages">0</div></div>
+        <div class="stat"><div class="small">プレビュー</div><div class="v" id="sumPreview">0</div></div>
+        <div class="stat"><div class="small">完了</div><div class="v" id="sumDone">0</div></div>
+        <div class="stat"><div class="small">仕掛</div><div class="v" id="sumDoing">0</div></div>
+        <div class="stat"><div class="small">全体進捗</div><div class="v" id="sumPct">0%</div></div>
+      </div>
+      <div class="progressOuter"><div class="progressInner" id="sumBar"></div></div>
+      <div style="height:10px"></div>
+
+      <div class="notice">
+        CMC内部のページリンク順を使って「1ページ、2ページ…」を決定します。
+        `page0001.clip` のようなファイル名順では並べません。
+      </div>
+
+      <div class="toolbar">
+        <input id="search" placeholder="ページ番号・clipファイル名で検索">
+        <select id="statusFilter">
+          <option value="">全ステータス</option>
+          <option>未着手</option><option>作業中</option><option>完了</option><option>保留</option>
+        </select>
+        <select id="thumbSize">
+          <option value="140">小</option>
+          <option value="170" selected>中</option>
+          <option value="220">大</option>
+          <option value="280">特大</option>
+        </select>
+      </div>
+
+      <div class="workFilterBox" id="workFilterBox">
+        <span class="workFilterTitle">現在の作業で絞り込み：</span>
+        <label class="workFilterItem"><input type="checkbox" value="ネーム">ネーム</label>
+        <label class="workFilterItem"><input type="checkbox" value="下書き">下書き</label>
+        <label class="workFilterItem"><input type="checkbox" value="線画">線画</label>
+        <label class="workFilterItem"><input type="checkbox" value="擬音・効果音">擬音・効果音</label>
+        <label class="workFilterItem"><input type="checkbox" value="色塗り">色塗り</label>
+        <label class="workFilterItem"><input type="checkbox" value="テキスト">テキスト</label>
+        <label class="workFilterItem"><input type="checkbox" value="仕上げ">仕上げ</label>
+        <button class="workFilterClear" id="clearWorkFilter">解除</button>
+      </div>
+
+      <div id="pageGrid" class="pageGrid">
+        <div class="empty">作品フォルダーを読み込んでください。</div>
+      </div>
+    </div>
+  </section>
+  <div id="paneSplitter" class="paneSplitter" title="ドラッグして幅を変更"></div>
+
+
+  <section class="panel" style="container-type:inline-size">
+    <div class="head">
+      <span>選択ページ</span>
+      <div class="spacer"></div>
+      <span id="selectedLabel" class="small">未選択</span>
+    </div>
+    <div class="body">
+      <div id="noSelection" class="empty">ページを選択してください。</div>
+
+      <div id="editor" class="hidden">
+        <div class="editorSideBySide">
+          <div class="selectedPreview" id="selectedPreview"></div>
+          <div class="editorInputs">
+        <div class="grid2">
+          <div class="field">
+            <label>ページステータス</label>
+            <select id="statusEdit">
+              <option>未着手</option><option>作業中</option><option>完了</option><option>保留</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>ページ全体進捗（7工程平均）</label>
+            <div class="overallProgressBox">
+              <div class="overallProgressValue" id="overallProgressValue">0%</div>
+              <div class="progressOuter"><div class="progressInner" id="pageProgressBar"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>作業工程</label>
+          <div class="workTable" id="workTable"></div>
+        </div>
+
+        <div class="grid2">
+          <div class="field">
+            <label>予定作業時間（時間）</label>
+            <input id="estimateEdit" type="number" min="0" step="0.25">
+          </div>
+          <div class="field">
+            <label>実作業時間（CLIPから取得）</label>
+            <input id="actualEdit" type="number" min="0" step="0.01" readonly>
+            <div class="statusLine" id="actualWorkDetail">CLIP読込待ち</div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>メモ</label>
+          <textarea id="memoEdit" placeholder="残作業、修正点など"></textarea>
+        </div>
+
+        <label style="display:flex;align-items:center;gap:7px;margin-bottom:10px">
+          <input id="importantEdit" type="checkbox" style="width:auto">
+          重要ページとしてマーク
+        </label>
+
+        <button id="resetPage">このページの進捗を初期化</button>
+
+        <details class="detailInfo">
+          <summary>詳細情報</summary>
+          <div class="infoBox" id="pageInfo">-</div>
+        </details>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+
+<section id="thumbMode" class="thumbOnlyPage hidden">
+  <div class="thumbOnlyShell">
+    <div class="thumbOnlyToolbar">
+      <strong>サムネ一覧</strong><span class="small">全ページを横一列で表示</span>
+      <div class="spacer"></div>
+      <label>ページサイズ</label>
+      <input id="thumbOnlySize" type="range" min="80" max="1600" step="10" value="180">
+      <span id="thumbOnlySizeValue" class="thumbOnlySizeValue">180px</span>
+      <button id="thumbOnlyFit">標準</button>
+      <label>表示順 <select id="thumbOrderSource"><option value="original">CMC元順</option><option value="custom">変更した順番</option></select></label>
+      <button id="comicToggle" type="button">コミックモード</button>
+      <button id="exportComicNotes" type="button">コミックメモTXT出力</button>
+      <button id="exportComicBundle" type="button">画像＋メモJSON出力</button>
+      <button id="importComicBundle" type="button">画像＋メモJSON読込</button>
+      <input id="comicBundleInput" type="file" accept=".json,application/json" hidden>
+      <span class="small">Tab：UI表示切替</span>
+    </div>
+    <div class="thumbOnlyScroller" id="thumbOnlyScroller"><div class="thumbOnlyRow" id="thumbOnlyRow"></div></div>
+    <div class="comicReader hidden" id="comicReader">
+      <div class="comicSpread">
+        <div class="comicPage" id="comicLeft" title="次のページへ"></div>
+        <div class="comicPage" id="comicRight" title="前のページへ"></div>
+      </div>
+      <div class="comicControls">
+        <button id="comicNext" type="button">◀ 次へ（左）</button>
+        <label>ページ指定 <input id="comicPageInput" type="number" min="1" step="1"></label>
+        <button id="comicGo" type="button">移動</button>
+        <span class="small" id="comicPageStatus"></span>
+        <button id="comicPrev" type="button">前へ（右） ▶</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="orderMode" class="thumbOnlyPage hidden">
+  <div class="thumbOnlyShell">
+    <div class="thumbOnlyToolbar">
+      <strong>順番変更メーカー</strong>
+      <span class="small">カードをドラッグして並べ替え。CMC・CLIP本体は変更しません。</span>
+      <div class="spacer"></div>
+      <button id="orderReset" type="button">CMC元順に戻す</button>
+      <button id="orderOpenThumbs" type="button">変更順でサムネ一覧へ</button>
+    </div>
+    <div id="orderGrid" class="orderGrid"></div>
+  </div>
+</section>
+
+<section id="recordMode" class="thumbOnlyPage hidden">
+  <div class="thumbOnlyShell">
+    <div class="thumbOnlyToolbar" style="flex-wrap:wrap">
+      <strong>ページレコーディング</strong>
+      <span class="small" id="recordDirName">保存先：漫画フォルダー内 / recordings（自動作成）</span>
+      <span class="small" id="recordStatus" role="status" aria-live="polite"></span>
+      <button id="recordCapture" class="primary">レコーディング</button>
+      <button id="recordLoad">レコーディング読込</button>
+      <input type="file" id="recordFiles" accept=".json,application/json" multiple hidden>
+    </div>
+    <div class="thumbOnlyToolbar" style="flex-wrap:wrap">
+      <label>比較対象1（上） <select id="recordA"></select></label>
+      <label>比較対象2（下） <select id="recordB"></select></label>
+      <label><input id="recordSkipSameSize" type="checkbox" style="width:auto"> 画像サイズが同じページは差分から除外</label>
+      <span id="recordCount" class="small"></span>
+    </div>
+    <div id="recordCompare" class="recordCompare"></div>
+  </div>
+</section>
+
+<section id="statsMode" class="statsPage hidden">
+  <div class="statsShell">
+    <div class="head" style="margin:-14px -14px 14px;border-radius:8px 8px 0 0">
+      <span>作品進捗統計</span>
+      <div class="spacer"></div>
+      <span id="statsProjectName" class="small">作品未読込</span>
+    </div>
+
+    <div id="statsEmpty" class="statsEmpty">作品フォルダーを読み込むと統計を表示します。</div>
+
+    <div id="statsContent" class="hidden">
+      <div class="statsTop">
+        <div class="statsCard"><div class="label">総ページ</div><div class="value" id="stTotal">0</div></div>
+        <div class="statsCard"><div class="label">残りページ</div><div class="value" id="stRemaining">0</div></div>
+        <div class="statsCard"><div class="label">完了ページ</div><div class="value" id="stDone">0</div></div>
+        <div class="statsCard"><div class="label">作業中ページ</div><div class="value" id="stWorking">0</div></div>
+        <div class="statsCard"><div class="label">未着手ページ</div><div class="value" id="stUnstarted">0</div></div>
+        <div class="statsCard"><div class="label">合計作業時間</div><div class="value" id="stWorkTime">0時間00分</div><div class="statusLine" id="stWorkTimeHours">0.00時間</div></div>
+      </div>
+
+      <div class="statsCard">
+        <div class="label">作品全体平均進捗</div>
+        <div class="value" id="stOverallPct">0%</div>
+        <div class="statsBar"><div id="stOverallBar"></div></div>
+      </div>
+
+      <div class="statusLine" id="stHoldNote" style="margin-top:9px"></div>
+
+      <div class="statsSectionTitle">進捗履歴</div>
+      <div class="statsCard">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <select id="historyMetric"><option value="cumulative">累積進捗</option><option value="daily">日別進捗</option></select>
+          <select id="historyPeriod"><option value="7">直近7日</option><option value="30" selected>直近30日</option><option value="all">全期間</option></select>
+          <span class="small" id="historyCaption"></span>
+        </div>
+        <div style="overflow-x:auto"><svg id="historyChart" role="img" aria-label="進捗履歴グラフ" style="display:block;width:100%;min-width:440px;height:280px"></svg></div>
+        <div class="small" style="margin-top:8px">進捗変更時に自動記録します。保留ページは対象外です。記録開始前の履歴は復元できません。</div>
+      </div>
+      <div class="statsSectionTitle">工程ごとの残りページ</div>
+      <div class="workStatsGrid" id="workStatsGrid"></div>
+    </div>
+  </div>
+</section>
+
+<script>
+(() => {
+  const $=s=>document.querySelector(s);
+  const enc=new TextEncoder();
+  const dec=new TextDecoder();
+  const SIG_SQLI=[...enc.encode("CHNKSQLi")];
+  const SIG_SQLITE=[...enc.encode("SQLite format 3\0")];
+  const PNG_SIG=[0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a];
+
+  let project={name:"",cmcName:"",pages:[],cmcInfo:null};
+  let progressData={};
+  let progressHistory=[];
+  let selectedPageNo=null;
+  let objectUrls=[];
+  let currentDirectoryHandle=null;
+
+  const HANDLE_DB="mangaProgressDirectoryDB";
+  const HANDLE_STORE="handles";
+  const HANDLE_KEY="lastProjectDirectory";
+
+  function openHandleDB(){
+    return new Promise((resolve,reject)=>{
+      const req=indexedDB.open(HANDLE_DB,1);
+      req.onupgradeneeded=()=>{
+        const db=req.result;
+        if(!db.objectStoreNames.contains(HANDLE_STORE))db.createObjectStore(HANDLE_STORE);
+      };
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  }
+  async function saveDirectoryHandle(handle){
+    try{
+      const db=await openHandleDB();
+      await new Promise((resolve,reject)=>{
+        const tx=db.transaction(HANDLE_STORE,"readwrite");
+        tx.objectStore(HANDLE_STORE).put(handle,HANDLE_KEY);
+        tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);
+      });
+      db.close();
+    }catch(e){console.warn("フォルダーハンドル保存失敗",e)}
+  }
+  async function loadDirectoryHandle(){
+    try{
+      const db=await openHandleDB();
+      const handle=await new Promise((resolve,reject)=>{
+        const tx=db.transaction(HANDLE_STORE,"readonly");
+        const req=tx.objectStore(HANDLE_STORE).get(HANDLE_KEY);
+        req.onsuccess=()=>resolve(req.result||null);
+        req.onerror=()=>reject(req.error);
+      });
+      db.close();
+      return handle;
+    }catch(e){console.warn("フォルダーハンドル読込失敗",e);return null}
+  }
+  async function ensureDirectoryPermission(handle,request=false){
+    if(!handle)return false;
+    const opts={mode:"read"};
+    if(await handle.queryPermission(opts)==="granted")return true;
+    if(request && await handle.requestPermission(opts)==="granted")return true;
+    return false;
+  }
+  async function collectDirectoryFiles(handle){
+    const out=[];
+    async function walk(dir,prefix=""){
+      for await(const [name,entry] of dir.entries()){
+        if(entry.kind==="file"){
+          const file=await entry.getFile();
+          // webkitRelativePath は File System Access API では付かないので、
+          // 既存ロジック用に相対パスを別プロパティとして保持する。
+          out.push({file,relativePath:prefix+name});
+        }else if(entry.kind==="directory"){
+          await walk(entry,prefix+name+"/");
+        }
+      }
+    }
+    await walk(handle);
+    return out;
+  }
+  async function loadFromDirectoryHandle(handle,requestPermission=false){
+    if(!await ensureDirectoryPermission(handle,requestPermission)){
+      $("#projectStatus").textContent=`保存フォルダー: ${handle.name} / 再許可が必要`;
+      return false;
+    }
+    currentDirectoryHandle=handle;
+    await saveDirectoryHandle(handle);
+    $("#projectStatus").textContent=`${handle.name} / 読み込み中…`;
+    const entries=await collectDirectoryFiles(handle);
+    await loadProject(entries,handle.name);
+    return true;
+  }
+
+  function matchAt(a,p,sig){
+    if(p<0||p+sig.length>a.length)return false;
+    for(let i=0;i<sig.length;i++)if(a[p+i]!==sig[i])return false;
+    return true;
+  }
+  function findSig(a,sig,start=0){
+    outer:for(let i=start;i<=a.length-sig.length;i++){
+      for(let j=0;j<sig.length;j++)if(a[i+j]!==sig[j])continue outer;
+      return i;
+    }
+    return -1;
+  }
+  function u16be(a,p){return (a[p]<<8)|a[p+1]}
+  function u32be(a,p){return ((a[p]*0x1000000)+(a[p+1]<<16)+(a[p+2]<<8)+a[p+3])>>>0}
+  function u64beSafe(a,p){
+    let n=0n;
+    for(let i=0;i<8;i++)n=(n<<8n)|BigInt(a[p+i]);
+    if(n>BigInt(Number.MAX_SAFE_INTEGER))throw new Error("サイズ値が大きすぎます");
+    return Number(n);
+  }
+  function readVarint(a,p){
+    let x=0n;
+    for(let i=0;i<9;i++){
+      const b=a[p+i];
+      if(b===undefined)throw new Error("varint範囲外");
+      if(i===8){
+        x=(x<<8n)|BigInt(b);
+        return {value:Number(x),len:9};
+      }
+      x=(x<<7n)|BigInt(b&0x7f);
+      if((b&0x80)===0)return {value:Number(x),len:i+1};
+    }
+    throw new Error("varint解析失敗");
+  }
+  function serialLength(s){
+    if(s===0||s===8||s===9||s===10||s===11)return 0;
+    if(s===1)return 1;if(s===2)return 2;if(s===3)return 3;if(s===4)return 4;
+    if(s===5)return 6;if(s===6||s===7)return 8;
+    if(s>=12)return Math.floor((s-12)/2);
+    throw new Error("未対応serial type: "+s);
+  }
+  function readSignedInt(bytes){
+    if(!bytes.length)return 0;
+    let x=0n;
+    for(const b of bytes)x=(x<<8n)|BigInt(b);
+    const bits=BigInt(bytes.length*8);
+    if(x&(1n<<(bits-1n)))x-=1n<<bits;
+    return Number(x);
+  }
+  function parseRecord(payload){
+    const hv=readVarint(payload,0);
+    const headerSize=hv.value;
+    let hp=hv.len;
+    const serials=[];
+    while(hp<headerSize){
+      const v=readVarint(payload,hp);serials.push(v.value);hp+=v.len;
+    }
+    let dp=headerSize;
+    const values=[];
+    for(const s of serials){
+      const len=serialLength(s);
+      const bytes=payload.slice(dp,dp+len);dp+=len;
+      if(s===0)values.push(null);
+      else if(s>=1&&s<=6)values.push(readSignedInt(bytes));
+      else if(s===8)values.push(0);
+      else if(s===9)values.push(1);
+      else if(s===7){
+        values.push(new DataView(bytes.buffer,bytes.byteOffset,8).getFloat64(0,false));
+      }else if(s>=12&&s%2===0)values.push(bytes);
+      else if(s>=13&&s%2===1)values.push(dec.decode(bytes));
+      else values.push(bytes);
+    }
+    return {serials,values};
+  }
+  function sqliteMeta(db){
+    let pageSize=u16be(db,16);if(pageSize===1)pageSize=65536;
+    return {pageSize,reserved:db[20]};
+  }
+  function getBtreePage(db,pageNo,pageSize){
+    const base=(pageNo-1)*pageSize;
+    if(base<0||base>=db.length)throw new Error("B-treeページ範囲外: "+pageNo);
+    return {base,header:base+(pageNo===1?100:0)};
+  }
+  function reconstructLeafTableCell(db,pageNo,cellIndex,pageSize,reserved){
+    const usable=pageSize-reserved;
+    const {base,header}=getBtreePage(db,pageNo,pageSize);
+    if(db[header]!==0x0d)throw new Error(`page ${pageNo} がtable leafではありません`);
+    const count=u16be(db,header+3);
+    if(cellIndex>=count)throw new Error("セル範囲外");
+    const ptr=u16be(db,header+8+cellIndex*2);
+    let pos=base+ptr;
+    const pv=readVarint(db,pos);pos+=pv.len;
+    const payloadSize=pv.value;
+    const rv=readVarint(db,pos);pos+=rv.len;
+    const rowid=rv.value;
+
+    const maxLocal=usable-35;
+    const minLocal=Math.floor(((usable-12)*32)/255)-23;
+    let local;
+    if(payloadSize<=maxLocal)local=payloadSize;
+    else{
+      local=minLocal+((payloadSize-minLocal)%(usable-4));
+      if(local>maxLocal)local=minLocal;
+    }
+
+    const out=new Uint8Array(payloadSize);
+    out.set(db.slice(pos,pos+local),0);
+    let written=local;
+
+    if(payloadSize>local){
+      let overflow=u32be(db,pos+local);
+      const seen=new Set();
+      while(overflow&&written<payloadSize){
+        if(seen.has(overflow))throw new Error("overflow循環");
+        seen.add(overflow);
+        const ob=(overflow-1)*pageSize;
+        const next=u32be(db,ob);
+        const take=Math.min(usable-4,payloadSize-written);
+        out.set(db.slice(ob+4,ob+4+take),written);
+        written+=take;overflow=next;
+      }
+    }
+    if(written!==payloadSize)throw new Error("payload復元不足");
+    return {rowid,payload:out};
+  }
+  function walkTable(db,pageNo,pageSize,reserved,onRecord,visited=new Set()){
+    if(visited.has(pageNo))return;visited.add(pageNo);
+    const {base,header}=getBtreePage(db,pageNo,pageSize);
+    const type=db[header], count=u16be(db,header+3);
+    if(type===0x0d){
+      for(let i=0;i<count;i++)onRecord(reconstructLeafTableCell(db,pageNo,i,pageSize,reserved),pageNo,i);
+      return;
+    }
+    if(type===0x05){
+      for(let i=0;i<count;i++){
+        const ptr=u16be(db,header+12+i*2);
+        walkTable(db,u32be(db,base+ptr),pageSize,reserved,onRecord,visited);
+      }
+      const right=u32be(db,header+8);
+      if(right)walkTable(db,right,pageSize,reserved,onRecord,visited);
+      return;
+    }
+    throw new Error(`未対応B-tree type 0x${type.toString(16)}`);
+  }
+  function schemaTables(db){
+    const {pageSize,reserved}=sqliteMeta(db);
+    const tables={};
+    walkTable(db,1,pageSize,reserved,cell=>{
+      try{
+        const r=parseRecord(cell.payload).values;
+        if(r.length>=5&&r[0]==="table"&&typeof r[1]==="string"&&Number(r[3])>0){
+          tables[r[1]]={name:r[1],rootPage:Number(r[3]),sql:typeof r[4]==="string"?r[4]:""};
+        }
+      }catch(e){}
+    });
+    return tables;
+  }
+  function parseColumnNames(createSql){
+    const start=createSql.indexOf("("),end=createSql.lastIndexOf(")");
+    if(start<0||end<0)return [];
+    const body=createSql.slice(start+1,end);
+    const cols=[];
+    let part="",quote=null,depth=0;
+    const parts=[];
+    for(let i=0;i<body.length;i++){
+      const ch=body[i];
+      if(quote){
+        part+=ch;
+        if(ch===quote)quote=null;
+      }else if(ch==="'"||ch==='"'||ch==="`"||ch==="["){
+        quote=ch==="["?"]":ch;part+=ch;
+      }else if(ch==="("){depth++;part+=ch}
+      else if(ch===")"){depth--;part+=ch}
+      else if(ch===","&&depth===0){parts.push(part.trim());part=""}
+      else part+=ch;
+    }
+    if(part.trim())parts.push(part.trim());
+    for(const p of parts){
+      if(/^(PRIMARY|UNIQUE|CHECK|FOREIGN|CONSTRAINT)\b/i.test(p))continue;
+      const m=p.match(/^\s*(?:"([^"]+)"|`([^`]+)`|\[([^\]]+)\]|([^\s]+))/);
+      if(m)cols.push(m[1]||m[2]||m[3]||m[4]);
+    }
+    return cols;
+  }
+  function readTable(db,tableName){
+    const tables=schemaTables(db);
+    const t=tables[tableName];
+    if(!t)throw new Error(`${tableName} テーブルが見つかりません`);
+    const cols=parseColumnNames(t.sql);
+    const {pageSize,reserved}=sqliteMeta(db);
+    const rows=[];
+    walkTable(db,t.rootPage,pageSize,reserved,cell=>{
+      const rec=parseRecord(cell.payload);
+      const row={};
+      cols.forEach((c,i)=>row[c]=rec.values[i]);
+      if(cols.includes("_PW_ID")&&row["_PW_ID"]==null)row["_PW_ID"]=cell.rowid;
+      row.__rowid=cell.rowid;
+      rows.push(row);
+    });
+    return {rows,columns:cols,rootPage:t.rootPage,sql:t.sql};
+  }
+
+  function extractClipSqlite(u8){
+    const chnk=findSig(u8,SIG_SQLI);
+    if(chnk<0)throw new Error("CHNKSQLi が見つかりません");
+    const size=u64beSafe(u8,chnk+8),start=chnk+16;
+    if(!matchAt(u8,start,SIG_SQLITE))throw new Error("SQLiteヘッダーなし");
+    return {db:u8.slice(start,start+size),chnkOffset:chnk,dbSize:size};
+  }
+  function extractCanvasPreview(u8){
+    const {db,chnkOffset,dbSize}=extractClipSqlite(u8);
+
+    const t=readTable(db,"CanvasPreview");
+    if(!t.rows.length)throw new Error("CanvasPreviewレコードなし");
+    const r=t.rows[0];
+    const blob=r.ImageData;
+    if(!(blob instanceof Uint8Array))throw new Error("ImageDataがBLOBではありません");
+    if(!matchAt(blob,0,PNG_SIG))throw new Error("ImageDataがPNGではありません");
+
+    let workTimeMs=0;
+    try{
+      const canvasTable=readTable(db,"Canvas");
+      if(canvasTable.rows.length){
+        workTimeMs=Math.max(0,Number(canvasTable.rows[0].CanvasWorkTime)||0);
+      }
+    }catch(e){
+      console.warn("CanvasWorkTime取得失敗",e);
+    }
+
+    return {
+      png:blob,width:Number(r.ImageWidth)||0,height:Number(r.ImageHeight)||0,
+      imageType:r.ImageType,rootPage:t.rootPage,chnkOffset,dbSize,
+      workTimeMs,
+      workTimeHours:workTimeMs/3600000
+    };
+  }
+
+  function parseCmc(u8){
+    if(!matchAt(u8,0,SIG_SQLITE))throw new Error("CMCがSQLite形式ではありません");
+    const projectTable=readTable(u8,"Project");
+    const canvasTable=readTable(u8,"CanvasNode");
+    if(!projectTable.rows.length)throw new Error("Project情報がありません");
+
+    const p=projectTable.rows[0];
+    const byId=new Map(canvasTable.rows.map(r=>[Number(r._PW_ID),r]));
+    const rootId=Number(p.ProjectRootCanvasNode);
+    const root=byId.get(rootId);
+    if(!root)throw new Error("ProjectRootCanvasNodeが見つかりません");
+
+    const ordered=[];
+    let cur=Number(root.FirstChildIndex)||0;
+    const seen=new Set();
+    while(cur&&!seen.has(cur)){
+      seen.add(cur);
+      const node=byId.get(cur);
+      if(!node)break;
+      if(node.LinkPath){
+        const raw=String(node.LinkPath);
+        const normalized=raw.replace(/^\.[:\\/]/,"").replace(/:/g,"/");
+        const basename=normalized.split(/[\\/]/).pop();
+        ordered.push({
+          cmcNodeId:cur,
+          linkPath:raw,
+          normalizedPath:normalized,
+          clipName:basename,
+          width:node.LinkWidth,
+          height:node.LinkHeight,
+          resolution:node.LinkResolution,
+          nextIndex:Number(node.NextIndex)||0
+        });
+      }
+      cur=Number(node.NextIndex)||0;
+    }
+
+    // 表紙は通常ページのNextIndexチェーンに含まれないCMCもある。
+    // CanvasNode全体から表紙ノードを探し、既存なら移動、なければ追加する。
+    if(Number(p.ComicCoverExist)){
+      const isCover=x=>/^page0*1\.clip$/i.test(x.clipName||"");
+      let coverIndex=ordered.findIndex(isCover);
+      if(coverIndex>0){
+        ordered.unshift(ordered.splice(coverIndex,1)[0]);
+      }else if(coverIndex<0){
+        const coverNode=canvasTable.rows.find(n=>{
+          const name=String(n.LinkPath||"").replace(/\\\\/g,"/").split(/[/:]/).pop();
+          return /^page0*1\.clip$/i.test(name);
+        });
+        if(coverNode){
+          const raw=String(coverNode.LinkPath);
+          const normalized=raw.replace(/^\\.[:\\\\/]/,"").replace(/:/g,"/");
+          ordered.unshift({
+            cmcNodeId:Number(coverNode._PW_ID),
+            linkPath:raw,normalizedPath:normalized,
+            clipName:normalized.split(/[\\\\/]/).pop(),
+            width:coverNode.LinkWidth,height:coverNode.LinkHeight,
+            resolution:coverNode.LinkResolution,
+            nextIndex:Number(coverNode.NextIndex)||0
+          });
+        }
+      }
+    }
+
+    return {
+      pages:ordered,
+      rootId,
+      firstChild:Number(root.FirstChildIndex)||0,
+      project:{
+        maxCanvasFileIndex:p.MaxCanvasFileIndex,
+        width:p.DefaultPageWidth,height:p.DefaultPageHeight,
+        resolution:p.DefaultPageResolution,
+        bindPosition:p.ComicBindPosition,startPage:p.ComicStartPage,
+        coverExist:p.ComicCoverExist
+      },
+      canvasRootPage:canvasTable.rootPage,
+      projectRootPage:projectTable.rootPage
+    };
+  }
+
+  const WORK_ITEMS=["ネーム","下書き","線画","擬音・効果音","色塗り","テキスト","仕上げ"];
+
+  function normalizeName(s){return String(s||"").toLowerCase()}
+  function defaultProgress(){
+    const works={};
+    for(const name of WORK_ITEMS)works[name]={active:false,progress:0};
+    return {status:"未着手",progress:0,estimate:"",actual:"",memo:"",important:false,works};
+  }
+  function calcOverallProgress(rec){
+    const total=WORK_ITEMS.reduce((sum,name)=>sum+(Number(rec.works?.[name]?.progress)||0),0);
+    return Math.round(total/WORK_ITEMS.length);
+  }
+  function migrateRecord(rec){
+    if(!rec || typeof rec!=="object")rec=defaultProgress();
+    if(!rec.works){
+      rec.works={};
+      for(const name of WORK_ITEMS)rec.works[name]={active:false,progress:0};
+      const map={"ネーム":"ネーム","下描き":"下書き","線画":"線画","仕上げ":"仕上げ"};
+      if(map[rec.status]){
+        const work=map[rec.status];
+        rec.works[work]={active:true,progress:Math.max(0,Math.min(100,Number(rec.progress)||0))};
+        rec.status="作業中";
+      }
+    }
+    for(const name of WORK_ITEMS){
+      if(!rec.works[name])rec.works[name]={active:false,progress:0};
+      rec.works[name].active=!!rec.works[name].active;
+      rec.works[name].progress=Math.max(0,Math.min(100,Number(rec.works[name].progress)||0));
+    }
+    if(!["未着手","作業中","完了","保留"].includes(rec.status))rec.status="未着手";
+    rec.progress=calcOverallProgress(rec);
+    return rec;
+  }
+  function syncPageStatus(rec){
+    rec.progress=calcOverallProgress(rec);
+    const anyActive=WORK_ITEMS.some(name=>rec.works[name].active);
+    const anyProgress=WORK_ITEMS.some(name=>rec.works[name].progress>0);
+    const allDone=WORK_ITEMS.every(name=>rec.works[name].progress>=100);
+    if(rec.status!=="保留"){
+      if(allDone)rec.status="完了";
+      else if(anyActive||anyProgress)rec.status="作業中";
+      else rec.status="未着手";
+    }
+  }
+  function storageKey(){return "mangaProgress:cmc:v02:"+(project.name||"unknown")}
+  function getRec(page){
+    const key=page.progressKey;
+    if(!progressData[key])progressData[key]=defaultProgress();
+    progressData[key]=migrateRecord(progressData[key]);
+    return progressData[key];
+  }
+  function historyKey(){return storageKey()+":history"}
+  function loadHistory(){
+    try{const data=JSON.parse(localStorage.getItem(historyKey())||"[]");progressHistory=Array.isArray(data)?data:[]}
+    catch(e){progressHistory=[]}
+  }
+  function currentOverallProgress(){
+    const included=project.pages.filter(p=>getRec(p).status!=="保留");
+    return included.length?included.reduce((sum,p)=>sum+calcOverallProgress(getRec(p)),0)/included.length:0;
+  }
+  function ensureHistoryBaseline(){
+    if(!project.name||!project.pages.length||progressHistory.length)return;
+    const date=new Date().toLocaleDateString("sv-SE");
+    const value=Number(currentOverallProgress().toFixed(3));
+    progressHistory.push({date,value,baseline:value});
+    localStorage.setItem(historyKey(),JSON.stringify(progressHistory));
+  }
+  function recordProgressHistory(){
+    if(!project.name||!project.pages.length)return;
+    const value=currentOverallProgress();
+    const date=new Date().toLocaleDateString("sv-SE");
+    const last=progressHistory[progressHistory.length-1];
+    if(last&&last.date===date)last.value=Number(value.toFixed(3));
+    else progressHistory.push({date,value:Number(value.toFixed(3))});
+    localStorage.setItem(historyKey(),JSON.stringify(progressHistory));
+  }
+  function saveProgressWithHistory(){
+    saveProgress();recordProgressHistory();
+  }
+  function loadProgress(){
+    try{
+      progressData=JSON.parse(localStorage.getItem(storageKey())||"{}");
+      for(const key of Object.keys(progressData))progressData[key]=migrateRecord(progressData[key]);
+    }catch(e){progressData={}}
+    loadHistory();
+    loadComicNotes();
+  }
+  function saveProgress(){
+    if(project.name)localStorage.setItem(storageKey(),JSON.stringify(progressData))
+  }
+  function cleanupUrls(){for(const u of objectUrls)URL.revokeObjectURL(u);objectUrls=[]}
+
+  async function loadProject(fileList,nameHint=""){
+    cleanupUrls();
+    progressData={};selectedPageNo=null;
+
+    const entries=[...fileList].map(x=>{
+      if(x && x.file instanceof File)return x;
+      return {file:x,relativePath:x.webkitRelativePath||x.name};
+    });
+    const files=entries.map(x=>x.file);
+    const cmcEntries=entries.filter(x=>x.file.name.toLowerCase().endsWith(".cmc"));
+    const clipEntries=entries.filter(x=>x.file.name.toLowerCase().endsWith(".clip"));
+
+    if(!cmcEntries.length){alert(".cmc ファイルが見つかりません。");return}
+    if(!clipEntries.length){alert(".clip ファイルが見つかりません。");return}
+
+    $("#projectStatus").textContent="CMC解析中…";
+    const cmcFile=cmcEntries[0].file;
+    let cmcInfo;
+    try{cmcInfo=parseCmc(new Uint8Array(await cmcFile.arrayBuffer()))}
+    catch(e){alert("CMC解析に失敗しました。\n"+e.message);return}
+
+    const clipMap=new Map();
+    for(const entry of clipEntries){
+      const f=entry.file;
+      clipMap.set(normalizeName(f.name),f);
+      const rel=entry.relativePath||f.webkitRelativePath||f.name;
+      clipMap.set(normalizeName(rel.replace(/\\/g,"/")),f);
+    }
+
+    const rootName=nameHint||(entries[0]?.relativePath||files[0]?.webkitRelativePath||"").split("/")[0];
+    project={
+      name:rootName||cmcFile.name.replace(/\.cmc$/i,""),
+      cmcName:cmcFile.name,
+      cmcInfo,
+      pages:cmcInfo.pages.map((p,i)=>({
+        ...p,
+        pageNo:i+1,
+        progressKey:`node:${p.cmcNodeId}`,
+        file:clipMap.get(normalizeName(p.clipName))||null,
+        preview:null,previewError:null,url:null
+      }))
+    };
+    loadProgress();
+    loadPageOrder();
+    ensureHistoryBaseline();
+    selectedPageNo=project.pages[0]?.pageNo||null;
+    renderBase();
+
+    // 順番に抽出。UIを固めないよう時々yield。
+    for(let i=0;i<project.pages.length;i++){
+      const p=project.pages[i];
+      if(!p.file){p.previewError="clip未検出";updateCard(p);continue}
+      try{
+        const u8=new Uint8Array(await p.file.arrayBuffer());
+        p.preview=extractCanvasPreview(u8);
+        p.url=URL.createObjectURL(new Blob([p.preview.png],{type:"image/png"}));
+        objectUrls.push(p.url);
+
+        // 実作業時間はCLIPの Canvas.CanvasWorkTime を正本とする。
+        const rec=getRec(p);
+        rec.actual=Math.round((p.preview.workTimeHours||0)*100)/100;
+        saveProgress();
+      }catch(e){p.previewError=e.message||String(e)}
+      updateCard(p);
+      if(!$("#orderMode").classList.contains("hidden"))renderOrderMaker();
+      renderSummary();
+      if(p.pageNo===selectedPageNo)renderEditor();
+      if(i%2===0)await new Promise(r=>setTimeout(r,0));
+    }
+    $("#projectStatus").textContent=`${project.name} / ${project.pages.length}ページ`;
+    $("#cmcStatus").textContent=`${project.cmcName} / CMC順序読込済み`;
+  }
+
+  function renderBase(){
+    $("#projectStatus").textContent=`${project.name} / ${project.pages.length}ページ`;
+    $("#cmcStatus").textContent=`${project.cmcName} / CMC順序読込済み`;
+    renderSummary();renderGrid();renderEditor();
+    if(!$("#statsMode").classList.contains("hidden"))buildStatistics();
+    if(!$("#thumbMode").classList.contains("hidden"))renderThumbOnly();
+    if(!$("#orderMode").classList.contains("hidden"))renderOrderMaker();
+  }
+  function renderSummary(){
+    let done=0,doing=0,sum=0,preview=0;
+    for(const p of project.pages){
+      const r=getRec(p);const val=Number(r.progress)||0;sum+=val;
+      if(p.preview)preview++;
+      if(r.status==="完了"||val>=100)done++;
+      else if(r.status!=="未着手"||val>0)doing++;
+    }
+    const pct=project.pages.length?Math.round(sum/project.pages.length):0;
+    $("#sumPages").textContent=project.pages.length;
+    $("#sumPreview").textContent=preview;
+    $("#sumDone").textContent=done;
+    $("#sumDoing").textContent=doing;
+    $("#sumPct").textContent=pct+"%";
+    $("#sumBar").style.width=pct+"%";
+  }
+  function selectedWorkFilters(){
+    return [...document.querySelectorAll('#workFilterBox input[type="checkbox"]:checked')]
+      .map(x=>x.value);
+  }
+
+  function visiblePages(){
+    const q=$("#search").value.trim().toLowerCase();
+    const sf=$("#statusFilter").value;
+    const wf=selectedWorkFilters();
+
+    return project.pages.filter(p=>{
+      const r=getRec(p);
+      const hit=!q||String(p.pageNo).includes(q)||p.clipName.toLowerCase().includes(q);
+      const statusHit=!sf||r.status===sf;
+      const workHit=wf.length===0 || wf.some(name=>r.works?.[name]?.active);
+      return hit&&statusHit&&workHit;
+    });
+  }
+  function renderGrid(){
+    const grid=$("#pageGrid");
+    grid.style.gridTemplateColumns=`repeat(auto-fill,minmax(${$("#thumbSize").value}px,1fr))`;
+    grid.innerHTML="";
+    if(!project.pages.length){
+      grid.innerHTML='<div class="empty">作品フォルダーを読み込んでください。</div>';return
+    }
+    const pages=visiblePages();
+    if(!pages.length){
+      grid.innerHTML='<div class="empty">条件に一致するページがありません。</div>';return
+    }
+    for(const p of pages)grid.appendChild(makeCard(p));
+  }
+  function statusClass(status){
+    switch(status){
+      case "未着手": return "status-notstarted";
+      case "作業中": return "status-working";
+      case "完了": return "status-done";
+      case "保留": return "status-hold";
+      default: return "";
+    }
+  }
+
+  function makeCard(p){
+    const r=getRec(p);
+    const card=document.createElement("div");
+    card.className="pageCard "+statusClass(r.status)+(p.pageNo===selectedPageNo?" active":"")+(p.file?"":" missing");
+    card.dataset.pageNo=p.pageNo;
+    card.innerHTML=`
+      <div class="thumb">
+        ${p.url?`<img src="${p.url}" alt="${p.pageNo}ページ">`
+          :p.previewError?`<div class="err">${esc(p.previewError)}</div>`
+          :`<div class="loading">プレビュー読込中…</div>`}
+        <div class="badge">${esc(r.status)}</div>
+      </div>
+      <div class="pageLabel">
+        <span>${r.important?"★ ":""}${p.pageNo}ページ</span>
+        <span class="pct">${Number(r.progress)||0}%</span>
+      </div>
+      <div class="workChips">
+        ${WORK_ITEMS.filter(name=>r.works[name]?.active).map(name=>
+          `<span class="workChip">${esc(name)} <span class="chipPct">${Number(r.works[name].progress)||0}%</span></span>`
+        ).join("") || `<span class="workChip">作業なし</span>`}
+      </div>
+      <div class="fileName" title="${esc(p.linkPath)}">${esc(p.clipName)}</div>`;
+    card.onclick=()=>{selectedPageNo=p.pageNo;renderGrid();renderEditor()};
+    return card;
+  }
+  function updateCard(p){
+    const old=document.querySelector(`.pageCard[data-page-no="${p.pageNo}"]`);
+    if(!old)return;
+    old.replaceWith(makeCard(p));
+  }
+  function selectedPage(){return project.pages.find(p=>p.pageNo===selectedPageNo)}
+  function renderEditor(){
+    const p=selectedPage();
+    if(!p){
+      $("#noSelection").classList.remove("hidden");$("#editor").classList.add("hidden");
+      $("#selectedLabel").textContent="未選択";return
+    }
+    $("#noSelection").classList.add("hidden");$("#editor").classList.remove("hidden");
+    $("#selectedLabel").textContent=`${p.pageNo}ページ`;
+    const r=getRec(p);
+
+    const pv=$("#selectedPreview");
+    if(p.url)pv.innerHTML=`<img src="${p.url}" alt="${p.pageNo}ページ">`;
+    else if(p.previewError)pv.innerHTML=`<div class="ngText">${esc(p.previewError)}</div>`;
+    else pv.innerHTML='<div class="small">プレビュー読込中…</div>';
+
+    $("#pageInfo").innerHTML=
+      `<b>${p.pageNo}ページ</b><br>`+
+      `CMC: node ${p.cmcNodeId}<br>`+
+      `CLIP: ${esc(p.clipName)}<br>`+
+      `リンク: ${esc(p.linkPath)}<br>`+
+      `原稿設定: ${p.width??"-"} × ${p.height??"-"} mm / ${p.resolution??"-"} dpi`+
+      (p.preview
+        ? `<br>CanvasPreview: ${p.preview.width} × ${p.preview.height}px / root ${p.preview.rootPage}`+
+          `<br>CanvasWorkTime: ${formatWorkTime(p.preview.workTimeMs)} (${Math.round(p.preview.workTimeMs).toLocaleString()} ms)`
+        : "");
+
+    $("#statusEdit").value=r.status;
+    $("#overallProgressValue").textContent=(Number(r.progress)||0)+"%";
+    $("#pageProgressBar").style.width=(Number(r.progress)||0)+"%";
+    $("#estimateEdit").value=r.estimate;
+
+    const clipWorkMs=p.preview?.workTimeMs||0;
+    const clipWorkHours=clipWorkMs/3600000;
+    $("#actualEdit").value=p.preview ? clipWorkHours.toFixed(2) : "";
+    $("#actualWorkDetail").textContent=
+      p.preview
+        ? `${formatWorkTime(clipWorkMs)} / CanvasWorkTime: ${Math.round(clipWorkMs).toLocaleString()} ms`
+        : (p.previewError ? "CLIP作業時間を取得できませんでした" : "CLIP読込待ち");
+
+    $("#memoEdit").value=r.memo;
+    $("#importantEdit").checked=!!r.important;
+
+    const wt=$("#workTable");
+    wt.innerHTML="";
+    for(const name of WORK_ITEMS){
+      const w=r.works[name];
+      const row=document.createElement("div");
+      row.className="workRow"+(w.active?" active":"");
+      row.innerHTML=`
+        <div class="workCheck"><input type="checkbox" ${w.active?"checked":""}></div>
+        <div class="workName">${esc(name)}</div>
+        <div class="workProgressWrap"><input type="number" min="0" max="100" step="1" value="${Number(w.progress)||0}"></div>
+        <div class="workPct">%</div>
+        <div class="workMiniBar"><div style="width:${Number(w.progress)||0}%"></div></div>
+      `;
+      const ck=row.querySelector('input[type="checkbox"]');
+      const num=row.querySelector('input[type="number"]');
+
+      ck.onchange=()=>{
+        const rec=getRec(p);
+        rec.works[name].active=ck.checked;
+        syncPageStatus(rec);
+        saveProgressWithHistory();
+        renderSummary();renderGrid();renderEditor();
+        if(!$("#statsMode").classList.contains("hidden"))buildStatistics();
+      };
+      num.onchange=()=>{
+        const rec=getRec(p);
+        rec.works[name].progress=Math.max(0,Math.min(100,Number(num.value)||0));
+        if(rec.works[name].progress>0 && rec.works[name].progress<100)rec.works[name].active=true;
+        if(rec.works[name].progress>=100)rec.works[name].active=false;
+        syncPageStatus(rec);
+        saveProgressWithHistory();
+        renderSummary();renderGrid();renderEditor();
+      };
+      wt.appendChild(row);
+    }
+  }
+  function updateField(field,value){
+    const p=selectedPage();if(!p)return;
+    const r=getRec(p);
+    r[field]=value;
+    if(field==="status"){
+      if(value==="完了"){
+        for(const name of WORK_ITEMS){
+          r.works[name].progress=100;
+          r.works[name].active=false;
+        }
+      }else if(value==="未着手"){
+        const hasProgress=WORK_ITEMS.some(name=>r.works[name].progress>0);
+        if(hasProgress)r.status="作業中";
+      }
+      r.progress=calcOverallProgress(r);
+    }
+    saveProgressWithHistory();renderSummary();renderGrid();renderEditor();
+  }
+  function formatWorkTime(ms){
+    ms=Math.max(0,Number(ms)||0);
+    const totalMinutes=Math.floor(ms/60000);
+    const hours=Math.floor(totalMinutes/60);
+    const minutes=totalMinutes%60;
+    if(hours>0)return `${hours}時間${String(minutes).padStart(2,"0")}分`;
+    return `${minutes}分`;
+  }
+
+  function esc(s){
+    return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))
+  }
+
+
+  function renderHistoryChart(){
+    const svg=$("#historyChart"), metric=$("#historyMetric").value, period=$("#historyPeriod").value;
+    const history=progressHistory.filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x.date)&&Number.isFinite(Number(x.value))).sort((a,b)=>a.date.localeCompare(b.date));
+    const today=new Date();today.setHours(0,0,0,0);
+    const start=new Date(today);
+    if(period!=="all"){
+      start.setDate(today.getDate()-Number(period)+1);
+      if(history.length){
+        const first=new Date(history[0].date+"T00:00:00");
+        if(!isNaN(first)&&first>start&&first<=today)start.setTime(first.getTime());
+      }
+    }
+    else if(history.length){const d=new Date(history[0].date+"T00:00:00");if(!isNaN(d))start.setTime(d.getTime())}
+    const days=Math.min(3650,Math.max(1,Math.round((today-start)/86400000)+1));
+    const byDate=new Map(history.map(x=>[x.date,Number(x.value)]));
+    let previous=null;
+    for(const x of history){if(x.date<start.toLocaleDateString("sv-SE"))previous=Number(x.value)}
+    // The initial recorded value is a snapshot, not progress made on that day.
+    // Older histories without a baseline cannot be reconstructed precisely.
+    const firstBaseline=history.length?(Number.isFinite(Number(history[0].baseline))&&history[0].baseline!==undefined?Number(history[0].baseline):0):0;
+    const series=[];
+    for(let i=0;i<days;i++){
+      const d=new Date(start);d.setDate(start.getDate()+i);
+      const key=d.toLocaleDateString("sv-SE");
+      const found=byDate.get(key);
+      const prior=previous===null?firstBaseline:previous;
+      if(found!==undefined)previous=found;
+      series.push({date:key,value:metric==="cumulative"?previous:(found===undefined?0:prior===null?0:found-prior),known:previous!==null});
+    }
+    const W=900,H=metric==="cumulative"?480:260,L=56,R=20,T=18,B=40;
+    const values=series.map(x=>x.value).filter(x=>x!==null);
+    const low=metric==="cumulative"?0:Math.min(0,...values);
+    const high=metric==="cumulative"?100:Math.max(1,...values);
+    const x=i=>L+(W-L-R)*(series.length===1?.5:i/(series.length-1));
+    const y=v=>T+(H-T-B)*(high-v)/(high-low||1);
+    const ns="http://www.w3.org/2000/svg";
+    svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+    svg.style.height=H+"px";
+    svg.innerHTML="";
+    const add=(tag,attrs,content)=>{
+      const el=document.createElementNS(ns,tag);
+      for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);
+      if(content!==undefined)el.textContent=content;
+      svg.appendChild(el);return el;
+    };
+    const yDivisions=metric==="cumulative"?20:4;
+    for(let i=0;i<=yDivisions;i++){
+      const v=low+(high-low)*i/yDivisions;
+      add("line",{x1:L,y1:y(v),x2:W-R,y2:y(v),stroke:"#424852","stroke-width":1});
+      add("text",{x:L-8,y:y(v)+4,fill:"#b7bdc7","font-size":12,"text-anchor":"end"},v.toFixed(metric==="cumulative"?0:1)+(metric==="cumulative"?"%":"pt"));
+    }
+    const ticks=Math.min(6,series.length);
+    for(let i=0;i<ticks;i++){
+      const idx=ticks===1?0:Math.round(i*(series.length-1)/(ticks-1));
+      add("text",{x:x(idx),y:H-12,fill:"#b7bdc7","font-size":12,"text-anchor":"middle"},series[idx].date.slice(5));
+    }
+    if(metric==="cumulative"){
+      let path="";
+      series.forEach((p,i)=>{if(p.value!==null)path+=(path?" L":"M")+x(i).toFixed(2)+" "+y(p.value).toFixed(2)});
+      if(path)add("path",{d:path,fill:"none",stroke:"#7db8ed","stroke-width":3,"stroke-linejoin":"round"});
+      // A single day's history has no line segment: show its actual data point.
+      series.forEach((p,i)=>{
+        if(p.value!==null && byDate.has(p.date)){
+          const dot=add("circle",{cx:x(i),cy:y(p.value),r:5,fill:"#7db8ed",stroke:"#ffffff","stroke-width":1.5});
+          const tip=document.createElementNS(ns,"title");
+          tip.textContent=`${p.date}: ${p.value.toFixed(2)}%`;
+          dot.appendChild(tip);
+        }
+      });
+    }else{
+      const barWidth=Math.max(1,Math.min(28,(W-L-R)/series.length*.72));
+      series.forEach((p,i)=>{
+        const zero=y(0), yy=y(p.value);
+        add("rect",{x:x(i)-barWidth/2,y:Math.min(zero,yy),width:barWidth,height:Math.max(1,Math.abs(zero-yy)),fill:p.value<0?"#db8c8c":"#7db8ed"});
+      });
+    }
+    $("#historyCaption").textContent=history.length?`${history.length}日分の記録 / 最新 ${history[history.length-1].date}`:"記録はまだありません。進捗を変更すると記録を開始します。";
+  }
+  $("#historyMetric").onchange=renderHistoryChart;
+  $("#historyPeriod").onchange=renderHistoryChart;
+
+  function buildStatistics(){
+    const allPages=project.pages;
+    if(!allPages.length){
+      $("#statsEmpty").classList.remove("hidden");
+      $("#statsContent").classList.add("hidden");
+      $("#statsProjectName").textContent="作品未読込";
+      return;
+    }
+
+    $("#statsEmpty").classList.add("hidden");
+    $("#statsContent").classList.remove("hidden");
+
+    // 保留ページは統計対象から完全に除外する。
+    const holdPages=allPages.filter(p=>getRec(p).status==="保留");
+    const targetPages=allPages.filter(p=>getRec(p).status!=="保留");
+    const total=targetPages.length;
+
+    $("#statsProjectName").textContent=
+      `${project.name} / 統計対象 ${total}ページ`;
+
+    let done=0,working=0,unstarted=0,sumProgress=0,totalWorkTimeMs=0;
+    for(const p of targetPages){
+      const r=getRec(p);
+      sumProgress+=Number(r.progress)||0;
+      totalWorkTimeMs+=Math.max(0,Number(p.preview?.workTimeMs)||0);
+      if(r.status==="完了" || Number(r.progress)>=100)done++;
+      else if(r.status==="作業中")working++;
+      else if(r.status==="未着手")unstarted++;
+    }
+
+    const remaining=Math.max(0,total-done);
+    const overall=total ? Math.round(sumProgress/total) : 0;
+
+    $("#stTotal").textContent=total;
+    $("#stRemaining").textContent=remaining;
+    $("#stDone").textContent=done;
+    $("#stWorking").textContent=working;
+    $("#stUnstarted").textContent=unstarted;
+    $("#stWorkTime").textContent=formatWorkTime(totalWorkTimeMs);
+    $("#stWorkTimeHours").textContent=(totalWorkTimeMs/3600000).toFixed(2)+"時間";
+    $("#stOverallPct").textContent=overall+"%";
+    $("#stOverallBar").style.width=overall+"%";
+    $("#stHoldNote").textContent=
+      holdPages.length
+        ? `※ 保留 ${holdPages.length}ページは統計から除外しています。`
+        : "※ 保留ページは統計から除外されます。";
+
+    renderHistoryChart();
+    const grid=$("#workStatsGrid");
+    grid.innerHTML="";
+
+    for(const name of WORK_ITEMS){
+      let remain=0,complete=0,active=0,untouched=0,sum=0;
+
+      for(const p of targetPages){
+        const r=getRec(p);
+        const w=r.works?.[name] || {active:false,progress:0};
+        const pct=Math.max(0,Math.min(100,Number(w.progress)||0));
+        sum+=pct;
+
+        if(pct>=100)complete++;
+        else remain++;
+
+        if(w.active)active++;
+        if(pct===0)untouched++;
+      }
+
+      const avg=total ? Math.round(sum/total) : 0;
+      const card=document.createElement("div");
+      card.className="workStatCard";
+      card.innerHTML=`
+        <div class="workStatTitle">${esc(name)}</div>
+        <div class="workStatMain">
+          <div>
+            <div class="small">あと</div>
+            <div class="workStatRemain">${remain}<small> ページ</small></div>
+          </div>
+          <div style="text-align:right">
+            <div class="small">平均進捗</div>
+            <div style="font-size:20px;font-weight:800">${avg}%</div>
+          </div>
+        </div>
+        <div class="workStatRows">
+          <div class="workStatMini"><div class="k">完了</div><div class="v">${complete}ページ</div></div>
+          <div class="workStatMini"><div class="k">現在作業中</div><div class="v">${active}ページ</div></div>
+          <div class="workStatMini"><div class="k">未着手</div><div class="v">${untouched}ページ</div></div>
+          <div class="workStatMini"><div class="k">着手済み未完了</div><div class="v">${Math.max(0,remain-untouched)}ページ</div></div>
+        </div>
+        <div class="statsBar"><div style="width:${avg}%"></div></div>
+      `;
+      grid.appendChild(card);
+    }
+  }
+
+  // ページの実体はcmcNodeIdで識別。変更順は表示専用でファイルを書き換えない。
+  let customPageOrder=[];
+  function pageOrderKey(){return storageKey()+":pageOrder"}
+  function pageIdentity(p){return String(p.progressKey||("node:"+p.cmcNodeId))}
+  function loadPageOrder(){
+    try{const value=JSON.parse(localStorage.getItem(pageOrderKey())||"[]");customPageOrder=Array.isArray(value)?value.filter(x=>typeof x==="string"):[]}
+    catch(e){customPageOrder=[]}
+    normalizePageOrder();
+  }
+  function normalizePageOrder(){
+    const valid=new Set(project.pages.map(pageIdentity));
+    customPageOrder=[...new Set(customPageOrder.filter(k=>valid.has(k)))];
+    for(const p of project.pages){const k=pageIdentity(p);if(!customPageOrder.includes(k))customPageOrder.push(k)}
+  }
+  function savePageOrder(){if(project.name)localStorage.setItem(pageOrderKey(),JSON.stringify(customPageOrder))}
+  function orderedPages(){
+    if($("#thumbOrderSource").value!=="custom")return project.pages;
+    normalizePageOrder();
+    const map=new Map(project.pages.map(p=>[pageIdentity(p),p]));
+    return customPageOrder.map(k=>map.get(k)).filter(Boolean);
+  }
+  function renderOrderMaker(){
+    const grid=$("#orderGrid");grid.replaceChildren();
+    normalizePageOrder();
+    const map=new Map(project.pages.map(p=>[pageIdentity(p),p]));
+    customPageOrder.forEach((key,index)=>{
+      const p=map.get(key);if(!p)return;
+      const card=document.createElement("div");card.className="orderCard";card.draggable=true;card.dataset.key=key;
+      const img=p.url?document.createElement("img"):document.createElement("div");
+      if(p.url){img.src=p.url;img.alt=p.pageNo+"ページ"}
+      else{img.style.cssText="height:190px;display:grid;place-items:center";img.textContent=p.previewError?"読込失敗":"No Preview"}
+      const meta=document.createElement("div");meta.className="orderMeta";
+      const pos=document.createElement("span");pos.className="orderPosition";pos.textContent=(index+1)+"番目";
+      const original=document.createElement("span");original.textContent="元 "+p.pageNo+"P";
+      meta.append(pos,original);card.append(img,meta);
+      card.title=p.clipName||"";
+      card.addEventListener("dragstart",e=>{e.dataTransfer.setData("text/plain",key);e.dataTransfer.effectAllowed="move";card.classList.add("dragging")});
+      card.addEventListener("dragend",()=>{grid.querySelectorAll(".orderCard").forEach(c=>c.classList.remove("dragging","dropTarget"))});
+      card.addEventListener("dragover",e=>{e.preventDefault();e.dataTransfer.dropEffect="move";card.classList.add("dropTarget")});
+      card.addEventListener("dragleave",()=>card.classList.remove("dropTarget"));
+      card.addEventListener("drop",e=>{
+        e.preventDefault();card.classList.remove("dropTarget");
+        const from=e.dataTransfer.getData("text/plain");
+        if(!customPageOrder.includes(from)||from===key)return;
+        const fromIndex=customPageOrder.indexOf(from),toIndex=customPageOrder.indexOf(key);
+        customPageOrder.splice(fromIndex,1);customPageOrder.splice(toIndex,0,from);
+        savePageOrder();renderOrderMaker();
+      });
+      grid.appendChild(card);
+    });
+    if(!project.pages.length)grid.textContent="作品フォルダーを読み込んでください。";
+  }
+  $("#orderReset").onclick=()=>{
+    if(!project.pages.length||!confirm("変更したページ順をCMC元順に戻しますか？"))return;
+    customPageOrder=project.pages.map(pageIdentity);savePageOrder();renderOrderMaker();
+  };
+  $("#orderOpenThumbs").onclick=()=>{
+    $("#thumbOrderSource").value="custom";setMode("thumbs");
+  };
+  $("#thumbOrderSource").onchange=()=>{
+    if(comicMode){comicSpreadIndex=0;renderComic()}else renderThumbOnly();
+  };
+  let comicNotes={};
+  function comicNotesKey(){return storageKey()+":comicNotes"}
+  function loadComicNotes(){try{comicNotes=JSON.parse(localStorage.getItem(comicNotesKey())||"{}")||{}}catch(e){comicNotes={}}}
+  function saveComicNotes(){if(project.name)localStorage.setItem(comicNotesKey(),JSON.stringify(comicNotes))}
+  // 表示順に合わせたページ番号と、元のCMCページに紐づくメモをTXTへ出力。
+  $("#exportComicNotes").onclick=()=>{
+    if(!project.pages.length){alert("先に作品フォルダーを読み込んでください。");return}
+    const pages=orderedPages();
+    const lines=[`${project.name} コミックメモ`,
+      `表示順：${$("#thumbOrderSource").value==="custom"?"変更した順番":"CMC元順"}`,""];
+    let count=0;
+    pages.forEach((p,i)=>{
+      const memo=String(comicNotes[String(p.pageNo)]||"");
+      if(!memo.trim())return;
+      count++;
+      lines.push(`${i+1}ページ（元${p.pageNo}ページ）`,memo,"");
+    });
+    if(!count)lines.push("（メモが入力されたページはありません）");
+    const blob=new Blob(["\uFEFF"+lines.join("\r\n")],{type:"text/plain;charset=utf-8"});
+    const a=document.createElement("a");
+    const url=URL.createObjectURL(blob);
+    a.href=url;
+    a.download=`${project.name}_コミックメモ.txt`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
+  // WebPはブラウザで再エンコードし、JSONにBase64 data URLとして格納。
+  async function imageToWebp(url,quality=.72,maxDimension=1400){
+    const img=new Image();img.src=url;
+    await img.decode();
+    const scale=Math.min(1,maxDimension/Math.max(img.naturalWidth,img.naturalHeight));
+    const w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale));
+    const canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;
+    canvas.getContext("2d",{alpha:false}).drawImage(img,0,0,w,h);
+    const data=canvas.toDataURL("image/webp",quality);
+    if(!data.startsWith("data:image/webp;base64,"))throw new Error("このブラウザはWebP書き出しに対応していません");
+    return {data,width:w,height:h};
+  }
+  function downloadJson(data,filename){
+    const blob=new Blob([JSON.stringify(data)],{type:"application/json;charset=utf-8"});
+    const url=URL.createObjectURL(blob),a=document.createElement("a");
+    a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }
+  $("#exportComicBundle").onclick=async()=>{
+    if(!project.pages.length){alert("先に作品を読み込んでください");return}
+    const btn=$("#exportComicBundle");btn.disabled=true;
+    try{
+      const pages=[];
+      const sorted=orderedPages();
+      for(let i=0;i<sorted.length;i++){
+        const p=sorted[i];btn.textContent=`WebP変換 ${i+1}/${sorted.length}`;
+        const image=p.url?await imageToWebp(p.url):null;
+        pages.push({pageId:pageIdentity(p),originalPage:p.pageNo,displayPage:i+1,
+          clipName:p.clipName||"",memo:String(comicNotes[String(p.pageNo)]||""),
+          image:image?image.data:null,width:image?.width||0,height:image?.height||0});
+        if(i%3===0)await new Promise(r=>setTimeout(r,0));
+      }
+      downloadJson({format:"manga-comic-bundle",version:1,projectName:project.name,
+        exportedAt:new Date().toISOString(),orderSource:$("#thumbOrderSource").value,
+        imageFormat:"image/webp",quality:.72,maxDimension:1400,pages},`${project.name}_画像メモ.json`);
+    }catch(e){alert("JSON出力に失敗しました: "+e.message)}
+    finally{btn.disabled=false;btn.textContent="画像＋メモJSON出力"}
+  };
+  $("#importComicBundle").onclick=()=>$("#comicBundleInput").click();
+  $("#comicBundleInput").onchange=async e=>{
+    const f=e.target.files[0];if(!f)return;
+    try{
+      const d=JSON.parse(await f.text());
+      if(d.format!=="manga-comic-bundle"||!Array.isArray(d.pages)||d.pages.length>2000)
+        throw new Error("画像＋メモJSON形式ではありません");
+      if(!confirm("現在の作品表示をJSONの画像・メモに切り替えますか？（元ファイルは変更しません）"))return;
+      cleanupUrls();
+      project={name:String(d.projectName||"JSON作品"),cmcName:"JSON画像メモ",cmcInfo:null,
+        pages:d.pages.map((p,i)=>{
+          if(p.image!==null&&p.image!==undefined&&(!/^data:image\/webp;base64,[A-Za-z0-9+/=]+$/.test(p.image)))throw new Error("画像データ形式が不正です");
+          return {pageNo:i+1,cmcNodeId:i+1,progressKey:"json:"+i,recordingId:String(p.pageId||("json:"+i)),clipName:String(p.clipName||""),
+            url:p.image||null,preview:null,previewError:null,file:null,originalPage:Number(p.originalPage)||i+1};
+        })};
+      progressData={};progressHistory=[];comicNotes={};
+      for(let i=0;i<d.pages.length;i++)comicNotes[String(i+1)]=String(d.pages[i].memo||"");
+      customPageOrder=project.pages.map(pageIdentity);
+      $("#thumbOrderSource").value="original";
+      selectedPageNo=1;comicMode=true;comicSpreadIndex=0;
+      $("#projectStatus").textContent=`${project.name} / JSON読込 ${project.pages.length}ページ`;
+      $("#cmcStatus").textContent="画像＋メモJSON（CMC/CLIPなし）";
+      renderBase();setMode("thumbs");renderComic();
+      // JSON閲覧時のメモ編集は現在の画面内で可能。JSONファイルへは再出力で反映する。
+    }catch(err){alert("JSON読込に失敗しました: "+err.message)}
+    finally{e.target.value=""}
+  };
+  let comicMode=false;
+  let comicSpreadIndex=0;
+  function comicSpreadForPage(index){return index<=0?0:1+Math.floor((index-1)/2)}
+  function comicSpreadCount(){const pages=orderedPages();return pages.length?1+Math.ceil((pages.length-1)/2):0}
+  function comicSpreadPages(){
+    const pages=orderedPages();
+    if(comicSpreadIndex===0)return {left:null,right:pages[0]||null};
+    const i=1+(comicSpreadIndex-1)*2;
+    return {right:pages[i]||null,left:pages[i+1]||null};
+  }
+  function renderComic(){
+    if(!comicMode)return;
+    const count=comicSpreadCount();
+    comicSpreadIndex=Math.max(0,Math.min(Math.max(0,count-1),comicSpreadIndex));
+    const pages=comicSpreadPages();
+    for(const side of ["left","right"]){
+      const el=$("#comic"+(side==="left"?"Left":"Right"));
+      const p=pages[side];el.replaceChildren();
+      const noteArea=document.createElement("div");noteArea.className="comicNoteArea";
+      const noteLabel=document.createElement("label");noteLabel.textContent="メモ";
+      const note=document.createElement("textarea");note.placeholder="ここにメモを入力";
+      const noteKey=String(p?.pageNo??("blank:"+comicSpreadIndex+":"+side)); // 元のCMCページ番号に紐づける
+      note.value=comicNotes[noteKey]||"";
+      note.addEventListener("click",e=>e.stopPropagation());
+      note.addEventListener("pointerdown",e=>e.stopPropagation());
+      note.addEventListener("keydown",e=>e.stopPropagation());
+      note.addEventListener("input",()=>{comicNotes[noteKey]=note.value;saveComicNotes()});
+      noteArea.append(noteLabel,note);
+      const imageArea=document.createElement("div");imageArea.className="comicImageArea";
+      if(p){
+        if(p.url){const img=document.createElement("img");img.src=p.url;img.alt=`${p.pageNo}ページ`;imageArea.appendChild(img)}
+        else{const msg=document.createElement("span");msg.className="small";msg.textContent=p.previewError?"読込失敗":"No Preview";imageArea.appendChild(msg)}
+        const label=document.createElement("div");label.className="comicLabel";label.textContent=`${orderedPages().indexOf(p)+1}ページ`+( $("#thumbOrderSource").value==="custom"?`（元${p.pageNo}P）`:"");imageArea.appendChild(label);
+      }else{const msg=document.createElement("span");msg.className="small";msg.textContent="余白";imageArea.appendChild(msg)}
+      if(side==="left")el.append(noteArea,imageArea);else el.append(imageArea,noteArea);
+    }
+    const right=pages.right,left=pages.left;
+    $("#comicPageInput").max=String(project.pages.length||1);
+    $("#comicPageInput").value=right?String(orderedPages().indexOf(right)+1):"";
+    $("#comicPageStatus").textContent=count?`${right?orderedPages().indexOf(right)+1:""}${left?"・"+(orderedPages().indexOf(left)+1):""} / 全${project.pages.length}ページ（${comicSpreadIndex+1}/${count}見開き）`:"作品を読み込んでください";
+    $("#comicPrev").disabled=comicSpreadIndex<=0;
+    $("#comicNext").disabled=comicSpreadIndex>=count-1;
+  }
+  function comicMove(delta){comicSpreadIndex=Math.max(0,Math.min(comicSpreadCount()-1,comicSpreadIndex+delta));renderComic()}
+  function comicJump(){
+    const n=Number($("#comicPageInput").value);
+    const index=orderedPages().findIndex((p,i)=>i+1===n);
+    if(index<0){alert("存在するページ番号を指定してください");return}
+    comicSpreadIndex=comicSpreadForPage(index);renderComic();
+  }
+  function setComicMode(on){
+    comicMode=on;
+    $("#thumbOnlyScroller").classList.toggle("hidden",on);
+    $("#comicReader").classList.toggle("hidden",!on);
+    // サイズ調整は一覧・コミックの両モードで利用可能
+    $("#comicToggle").textContent=on?"一覧に戻る":"コミックモード";
+    if(on){const index=orderedPages().findIndex(p=>p.pageNo===selectedPageNo);comicSpreadIndex=comicSpreadForPage(Math.max(0,index));renderComic()}
+    else renderThumbOnly();
+  }
+  $("#comicToggle").onclick=()=>setComicMode(!comicMode);
+  $("#comicLeft").onclick=()=>comicMove(1);
+  $("#comicRight").onclick=()=>comicMove(-1);
+  $("#comicPrev").onclick=()=>comicMove(-1);
+  $("#comicNext").onclick=()=>comicMove(1);
+  $("#comicGo").onclick=comicJump;
+  $("#comicPageInput").onkeydown=e=>{if(e.key==="Enter")comicJump()};
+  const THUMB_ONLY_SIZE_KEY="mangaProgress:thumbOnlySize";
+  function renderThumbOnly(){
+    if(comicMode){renderComic();return}
+    const scroller=$("#thumbOnlyScroller") || $("#thumbOnlyRow")?.parentElement;
+    const keepLeft=scroller?.scrollLeft||0;
+    const keepTop=scroller?.scrollTop||0;
+    const row=$("#thumbOnlyRow"); row.innerHTML="";
+    if(!project.pages.length){
+      row.innerHTML='<div class="thumbOnlyEmpty">作品フォルダーを読み込むと全ページを横一列で表示します。</div>';
+      if(scroller){scroller.scrollLeft=keepLeft;scroller.scrollTop=keepTop}
+      return;
+    }
+    for(const [displayIndex,p] of orderedPages().entries()){
+      const r=getRec(p),card=document.createElement("div");
+      card.className="thumbOnlyCard "+statusClass(r.status)+(p.pageNo===selectedPageNo?" active":"");
+      card.innerHTML=`<div class="thumbOnlyImage">${p.url?`<img src="${p.url}" alt="${p.pageNo}ページ">`:`<span class="small">${p.previewError?"読込失敗":"No Preview"}</span>`}</div><div class="thumbOnlyMeta"><span>${r.important?"★ ":""}${displayIndex+1}ページ${$("#thumbOrderSource").value==="custom"?` (元${p.pageNo}P)`:""}</span><span>${Number(r.progress)||0}%</span></div>`;
+      card.onclick=()=>{selectedPageNo=p.pageNo;renderThumbOnly()};
+      card.ondblclick=()=>{selectedPageNo=p.pageNo;setMode("manage");renderGrid();renderEditor()};
+      row.appendChild(card);
+    }
+    if(scroller){
+      requestAnimationFrame(()=>{
+        scroller.scrollLeft=keepLeft;
+        scroller.scrollTop=keepTop;
+      });
+    }
+  }
+
+  let thumbAutoRefreshBusy=false;
+  async function refreshThumbOnlyPreviews(){
+    if(thumbAutoRefreshBusy || $("#thumbMode").classList.contains("hidden"))return;
+    if(!currentDirectoryHandle || !project.pages.length)return;
+    if(!await ensureDirectoryPermission(currentDirectoryHandle,false))return;
+
+    thumbAutoRefreshBusy=true;
+    const scroller=$("#thumbOnlyScroller") || $("#thumbOnlyRow")?.parentElement;
+    const keepLeft=scroller?.scrollLeft||0;
+    const keepTop=scroller?.scrollTop||0;
+
+    try{
+      const entries=await collectDirectoryFiles(currentDirectoryHandle);
+      const clipMap=new Map();
+      for(const entry of entries){
+        if(!entry.file.name.toLowerCase().endsWith(".clip"))continue;
+        const f=entry.file;
+        clipMap.set(normalizeName(f.name),f);
+        const rel=entry.relativePath||f.name;
+        clipMap.set(normalizeName(rel.replace(/\\/g,"/")),f);
+      }
+
+      let changed=false;
+      for(const p of project.pages){
+        const fresh=clipMap.get(normalizeName(p.clipName));
+        if(!fresh)continue;
+
+        // 更新日時とサイズが同じなら、重いCLIP解析はしない。
+        if(p.file && p.file.lastModified===fresh.lastModified && p.file.size===fresh.size)continue;
+
+        try{
+          const u8=new Uint8Array(await fresh.arrayBuffer());
+          const preview=extractCanvasPreview(u8);
+          const newUrl=URL.createObjectURL(new Blob([preview.png],{type:"image/png"}));
+
+          if(p.url){
+            URL.revokeObjectURL(p.url);
+            const oldIndex=objectUrls.indexOf(p.url);
+            if(oldIndex>=0)objectUrls.splice(oldIndex,1);
+          }
+          p.file=fresh;
+          p.preview=preview;
+          p.previewError=null;
+          p.url=newUrl;
+          objectUrls.push(newUrl);
+
+          const rec=getRec(p);
+          rec.actual=Math.round((preview.workTimeHours||0)*100)/100;
+          changed=true;
+        }catch(e){
+          // CLIP保存中など、一時的に読めない瞬間は今のサムネを維持する。
+          console.warn("サムネ自動更新を一時スキップ:",p.clipName,e);
+        }
+      }
+
+      if(changed){
+        saveProgress();
+        if(comicMode)renderComic();else renderThumbOnly();
+        renderSummary();
+        if(scroller){
+          requestAnimationFrame(()=>{
+            scroller.scrollLeft=keepLeft;
+            scroller.scrollTop=keepTop;
+          });
+        }
+      }
+    }catch(e){
+      console.warn("サムネ一覧の自動更新に失敗",e);
+    }finally{
+      thumbAutoRefreshBusy=false;
+    }
+  }
+
+  // サムネ一覧を開いている間だけ3秒ごとに変更されたCLIPを確認する。
+  setInterval(refreshThumbOnlyPreviews,3000);
+
+  function setThumbOnlySize(px,save=true){
+    px=Math.max(80,Math.min(1600,Number(px)||180));
+    $("#thumbOnlyRow").style.setProperty("--thumb-only-width",px+"px");
+    $("#comicReader").style.setProperty("--comic-page-width",px+"px");
+    $("#thumbOnlySize").value=px;$("#thumbOnlySizeValue").textContent=px+"px";
+    if(save)localStorage.setItem(THUMB_ONLY_SIZE_KEY,String(px));
+  }
+  // サムネ一覧表示中はTabキーでUI表示/非表示を切り替える。
+  document.addEventListener("keydown",e=>{
+    if(e.key!=="Tab" || $("#thumbMode").classList.contains("hidden"))return;
+    e.preventDefault();
+    document.body.classList.toggle("thumbUiHidden");
+  });
+  function setMode(mode){
+    const manage=mode==="manage",stats=mode==="stats",thumbs=mode==="thumbs",order=mode==="order",record=mode==="record";
+    if(!thumbs)document.body.classList.remove("thumbUiHidden");
+    $("#manageMode").classList.toggle("hidden",!manage);$("#statsMode").classList.toggle("hidden",!stats);$("#thumbMode").classList.toggle("hidden",!thumbs);$("#orderMode").classList.toggle("hidden",!order);$("#recordMode").classList.toggle("hidden",!record);
+    $("#modeManage").classList.toggle("active",manage);$("#modeStats").classList.toggle("active",stats);$("#modeThumbs").classList.toggle("active",thumbs);$("#modeOrder").classList.toggle("active",order);$("#modeRecord").classList.toggle("active",record);
+    if(order)renderOrderMaker();if(record)renderRecordComparison();if(stats)buildStatistics();if(thumbs){if(comicMode)renderComic();else renderThumbOnly();}
+  }
+  $("#modeManage").onclick=()=>setMode("manage");
+  $("#modeStats").onclick=()=>setMode("stats");
+  $("#modeThumbs").onclick=()=>setMode("thumbs");
+  $("#modeOrder").onclick=()=>setMode("order");
+  $("#modeRecord").onclick=()=>setMode("record");
+  $("#thumbOnlySize").oninput=e=>setThumbOnlySize(e.target.value);
+  $("#thumbOnlyFit").onclick=()=>setThumbOnlySize(180);
+  (()=>{const n=Number(localStorage.getItem(THUMB_ONLY_SIZE_KEY));setThumbOnlySize(n>0?n:180,false)})();
+
+  // レコーディングはスナップショットごとに独立したWebP画像を持つJSON。
+  // 同一IDの照合にはCMCノードID（JSON読み込み時はbundle由来のID）を使う。
+  // 保存先は読み込み済み漫画フォルダー内の recordings に固定。
+  // 新規のフォルダー選択ダイアログは使わず、既存のディレクトリハンドルを再利用する。
+  async function getRecordingOutputDirectory(){
+    if(!currentDirectoryHandle)throw new Error("先にCMC・CLIPの漫画フォルダーを選択してください。");
+    const permission={mode:"readwrite"};
+    let allowed=await currentDirectoryHandle.queryPermission(permission);
+    if(allowed!=="granted")allowed=await currentDirectoryHandle.requestPermission(permission);
+    if(allowed!=="granted")throw new Error("漫画フォルダーへの書き込み権限が必要です。");
+    return await currentDirectoryHandle.getDirectoryHandle("recordings",{create:true});
+  }
+  const recordings=[];
+  const safeName=x=>String(x||"recording").replace(/[\\/:*?"<>|]/g,"_");
+  function recordingId(p){return String(p.recordingId||p.progressKey||("node:"+p.cmcNodeId))}
+  function timestampName(d){return d.toISOString().replace(/[:.]/g,"-")}
+  function recordingLabel(d){return `${d.projectName||"作品"} / ${new Date(d.recordedAt).toLocaleString("ja-JP")} (${d.pages.length}P)`}
+  function addRecording(d){
+    if(!d||d.format!=="manga-page-recording"||!Array.isArray(d.pages))throw Error("レコーディングJSONではありません");
+    if(d.pages.length>2000)throw Error("ページ数が多すぎます");
+    for(const p of d.pages){if(typeof p.id!=="string"||!p.id||p.image!==null&&p.image!==undefined&&!/^data:image\/webp;base64,[A-Za-z0-9+/=]+$/.test(p.image))throw Error("ページIDまたは画像形式が不正です")}
+    if(recordings.some(x=>x.recordedAt===d.recordedAt&&x.projectName===d.projectName))return;
+    recordings.push(d);recordings.sort((a,b)=>a.recordedAt.localeCompare(b.recordedAt));
+    const selectedA=$("#recordA").value,selectedB=$("#recordB").value;
+    for(const id of ["recordA","recordB"]){const el=$("#"+id);el.replaceChildren();recordings.forEach((r,i)=>{const op=document.createElement("option");op.value=String(i);op.textContent=recordingLabel(r);el.appendChild(op)})}
+    $("#recordA").value=selectedA&&Number(selectedA)<recordings.length?selectedA:String(Math.max(0,recordings.length-2));
+    $("#recordB").value=selectedB&&Number(selectedB)<recordings.length?selectedB:String(recordings.length-1);
+    renderRecordComparison();
+  }
+  $("#recordCapture").onclick=async()=>{
+    if(!project.pages.length){alert("先に作品を読み込んでください");return}
+    const button=$("#recordCapture");button.disabled=true;
+    const status=$("#recordStatus");
+    let stage="開始";
+    const updateStatus=(label)=>{stage=label;status.textContent=label};
+    try{
+      updateStatus("漫画フォルダー内の recordings を準備中…");
+      const outputDirectory=await getRecordingOutputDirectory();
+      updateStatus("画像をWebPに変換中…");
+      const pages=[];
+      for(let i=0;i<project.pages.length;i++){
+        const p=project.pages[i];button.textContent=`記録中 ${i+1}/${project.pages.length}`;
+        const img=p.url?await imageToWebp(p.url,.72,1400):null;
+        pages.push({id:recordingId(p),originalPage:p.pageNo,clipName:p.clipName||"",image:img?.data||null,width:img?.width||0,height:img?.height||0});
+        if(i%3===0)await new Promise(r=>setTimeout(r,0));
+      }
+      const snapshot={format:"manga-page-recording",version:1,projectName:project.name,recordedAt:new Date().toISOString(),imageFormat:"image/webp",pages};
+      const filename=safeName(project.name)+"_recording_"+timestampName(new Date(snapshot.recordedAt))+".json";
+      const payload=JSON.stringify(snapshot);
+      updateStatus("JSONを書き込み中…");
+      const handle=await outputDirectory.getFileHandle(filename,{create:true});
+      const writer=await handle.createWritable();await writer.write(payload);await writer.close();
+      updateStatus("保存完了: "+filename);
+      addRecording(snapshot);
+      $("#recordB").value=String(recordings.indexOf(snapshot));renderRecordComparison();
+      alert("レコーディングを保存しました。保存先: "+currentDirectoryHandle.name+"/recordings/"+filename);
+    }catch(e){
+      const reason=(e?.name||"Error")+": "+(e?.message||String(e));
+      status.textContent="失敗（"+stage+"）: "+reason;
+      console.error("レコーディング保存失敗",{stage,error:e});
+      const hint="";
+      alert("レコーディングに失敗しました。\n処理: "+stage+"\n"+reason+hint);
+    }
+    finally{button.disabled=false;button.textContent="レコーディング"}
+  };
+  $("#recordLoad").onclick=()=>$("#recordFiles").click();
+  $("#recordFiles").onchange=async e=>{
+    let success=0;
+    for(const f of e.target.files){try{addRecording(JSON.parse(await f.text()));success++}catch(err){alert(f.name+": "+err.message)}}
+    e.target.value="";
+    if(success)renderRecordComparison();
+  };
+  $("#recordA").onchange=renderRecordComparison;
+  $("#recordB").onchange=renderRecordComparison;
+  $("#recordSkipSameSize").onchange=renderRecordComparison;
+  function renderRecordComparison(){
+    const target=$("#recordCompare");target.replaceChildren();
+    if(recordings.length<2){target.textContent="比較するには、異なる日時のレコーディングを2件読み込むか保存してください。";$("#recordCount").textContent="";return}
+    const a=recordings[Number($("#recordA").value)],b=recordings[Number($("#recordB").value)];
+    if(!a||!b)return;
+    const am=new Map(a.pages.map(p=>[p.id,p])),bm=new Map(b.pages.map(p=>[p.id,p]));
+    const ids=[...new Set([...a.pages.map(p=>p.id),...b.pages.map(p=>p.id)])];
+    const skip=$("#recordSkipSameSize").checked;
+    const selected=ids.filter(id=>{
+      const p=am.get(id),q=bm.get(id);
+      return !p||!q||!skip||p.width!==q.width||p.height!==q.height;
+    });
+    $("#recordCount").textContent=`表示 ${selected.length} / ${ids.length}ページ`;
+    if(!selected.length){target.textContent="表示対象の差分はありません。";return}
+    const makeRow=(snapshot,map,title)=>{
+      const h=document.createElement("div");h.className="recordSectionTitle";h.textContent=title+"："+recordingLabel(snapshot);target.appendChild(h);
+      const row=document.createElement("div");row.className="recordStrip";
+      for(const id of selected){
+        const p=map.get(id),tile=document.createElement("div");tile.className="recordTile";
+        if(p?.image){const img=document.createElement("img");img.src=p.image;img.alt=id;tile.appendChild(img)}
+        else{const empty=document.createElement("div");empty.className="recordMissing";empty.textContent=p?"画像なし":`ID ${id} のページが存在しない`;tile.appendChild(empty)}
+        const label=document.createElement("small");label.textContent=`${id} / ${p?"元"+p.originalPage+"P":"存在しない"}`;tile.appendChild(label);row.appendChild(tile);
+      }
+      target.appendChild(row);
+    };
+    makeRow(a,am,"上・比較対象1");makeRow(b,bm,"下・比較対象2");
+    // 上下の同じ列が同じIDになるように、横スクロール位置を同期。
+    const rows=target.querySelectorAll(".recordStrip");
+    let syncing=false;
+    rows.forEach((row,i)=>row.addEventListener("scroll",()=>{if(syncing)return;syncing=true;rows[1-i].scrollLeft=row.scrollLeft;requestAnimationFrame(()=>syncing=false)}));
+  }
+
+  const PANE_WIDTH_KEY="mangaProgress:selectedPaneWidth";
+  const manageModeEl=$("#manageMode");
+  const splitterEl=$("#paneSplitter");
+
+  function clampEditorWidth(px){
+    const appWidth=manageModeEl.getBoundingClientRect().width;
+    const minRight=360, minLeft=420, splitterWidth=8;
+    const maxRight=Math.max(minRight,appWidth-minLeft-splitterWidth);
+    return Math.max(minRight,Math.min(maxRight,px));
+  }
+  function setEditorWidth(px,save=true){
+    if(window.innerWidth<=1100)return;
+    const w=clampEditorWidth(px);
+    manageModeEl.style.setProperty("--editor-width",w+"px");
+    if(save)localStorage.setItem(PANE_WIDTH_KEY,String(Math.round(w)));
+  }
+  (()=>{
+    const saved=Number(localStorage.getItem(PANE_WIDTH_KEY));
+    if(Number.isFinite(saved)&&saved>0)setEditorWidth(saved,false);
+  })();
+
+  splitterEl.addEventListener("pointerdown",e=>{
+    if(window.innerWidth<=1100)return;
+    e.preventDefault();
+    splitterEl.setPointerCapture(e.pointerId);
+    splitterEl.classList.add("dragging");
+    document.body.classList.add("resizingPanes");
+    const startX=e.clientX;
+    const startWidth=parseFloat(getComputedStyle(manageModeEl).getPropertyValue("--editor-width"))||520;
+
+    const move=ev=>setEditorWidth(startWidth-(ev.clientX-startX),false);
+    const up=ev=>{
+      splitterEl.removeEventListener("pointermove",move);
+      splitterEl.removeEventListener("pointerup",up);
+      splitterEl.removeEventListener("pointercancel",up);
+      splitterEl.classList.remove("dragging");
+      document.body.classList.remove("resizingPanes");
+      const cur=parseFloat(getComputedStyle(manageModeEl).getPropertyValue("--editor-width"))||520;
+      localStorage.setItem(PANE_WIDTH_KEY,String(Math.round(cur)));
+      try{splitterEl.releasePointerCapture(ev.pointerId)}catch(_){}
+    };
+    splitterEl.addEventListener("pointermove",move);
+    splitterEl.addEventListener("pointerup",up);
+    splitterEl.addEventListener("pointercancel",up);
+  });
+
+  window.addEventListener("resize",()=>{
+    if(window.innerWidth>1100){
+      const cur=parseFloat(getComputedStyle(manageModeEl).getPropertyValue("--editor-width"))||520;
+      setEditorWidth(cur,false);
+    }
+  });
+
+  $("#pickFolder").onclick=async()=>{
+    if("showDirectoryPicker" in window){
+      try{
+        const handle=await window.showDirectoryPicker({mode:"read"});
+        await loadFromDirectoryHandle(handle,true);
+      }catch(e){
+        if(e.name!=="AbortError")alert("フォルダー選択に失敗しました。\n"+e.message);
+      }
+    }else{
+      $("#folderInput").click();
+    }
+  };
+
+  $("#reloadFolder").onclick=async()=>{
+    if(currentDirectoryHandle){
+      try{
+        const ok=await loadFromDirectoryHandle(currentDirectoryHandle,true);
+        if(!ok)alert("保存した作品フォルダーへのアクセス許可が必要です。");
+      }catch(e){alert("再読み込みに失敗しました。\n"+e.message)}
+      return;
+    }
+    // webkitdirectory方式はブラウザー仕様上フォルダーハンドルを永続化できない。
+    $("#folderInput").click();
+  };
+
+  $("#folderInput").onchange=e=>{
+    const files=[...e.target.files];
+    currentDirectoryHandle=null;
+    loadProject(files);
+    e.target.value="";
+  };
+
+  $("#search").oninput=renderGrid;
+  $("#statusFilter").onchange=renderGrid;
+  $("#thumbSize").onchange=renderGrid;
+
+  for(const ck of document.querySelectorAll('#workFilterBox input[type="checkbox"]')){
+    ck.onchange=renderGrid;
+  }
+  $("#clearWorkFilter").onclick=()=>{
+    for(const ck of document.querySelectorAll('#workFilterBox input[type="checkbox"]'))ck.checked=false;
+    renderGrid();
+  };
+
+  $("#statusEdit").onchange=e=>{
+    const p=selectedPage();
+    if(!p)return;
+    const previous=getRec(p).status;
+    const next=e.target.value;
+    if(next==="完了" && previous!=="完了" && !confirm("完了にしますか？")){
+      e.target.value=previous;
+      return;
+    }
+    updateField("status",next);
+  };
+  $("#estimateEdit").onchange=e=>updateField("estimate",e.target.value);
+  $("#memoEdit").oninput=e=>{
+    const p=selectedPage();if(!p)return;
+    getRec(p).memo=e.target.value;saveProgress()
+  };
+  $("#importantEdit").onchange=e=>updateField("important",e.target.checked);
+  $("#resetPage").onclick=()=>{
+    const p=selectedPage();if(!p)return;
+    if(!confirm(`${p.pageNo}ページの進捗情報を初期化しますか？`))return;
+    progressData[p.progressKey]=defaultProgress();saveProgressWithHistory();renderBase()
+  };
+
+  $("#exportProgress").onclick=()=>{
+    if(!project.pages.length){alert("先に作品フォルダーを読み込んでください。");return}
+    const payload={
+      format:"manga-progress-cmc-v0.2",
+      exportedAt:new Date().toISOString(),
+      project:{name:project.name,cmcName:project.cmcName},
+      progress:progressData,
+      history:progressHistory,
+      comicNotes:comicNotes,
+      pageOrder:customPageOrder
+    };
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=`${project.name}_progress.json`;a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000)
+  };
+  $("#importProgress").onclick=()=>$("#progressInput").click();
+  $("#progressInput").onchange=async e=>{
+    const f=e.target.files[0];if(!f)return;
+    try{
+      const d=JSON.parse(await f.text());
+      if(!d.progress)throw new Error("progressデータがありません");
+      progressData=d.progress;saveProgress();
+      if(Array.isArray(d.history)){progressHistory=d.history;localStorage.setItem(historyKey(),JSON.stringify(progressHistory))}
+      if(d.comicNotes&&typeof d.comicNotes==="object"&&!Array.isArray(d.comicNotes)){comicNotes=d.comicNotes;saveComicNotes()}
+      if(Array.isArray(d.pageOrder)){customPageOrder=d.pageOrder;normalizePageOrder();savePageOrder()}
+      renderBase();if(comicMode)renderComic()
+    }catch(err){alert("進捗JSON読込に失敗しました。\n"+err.message)}
+    e.target.value=""
+  };
+
+  // 前回選択した作品フォルダーを復元。
+  // 権限が維持されていれば自動再読込、失効していれば「再読み込み」で再許可できる。
+  (async()=>{
+    if(!("showDirectoryPicker" in window))return;
+    const handle=await loadDirectoryHandle();
+    if(!handle)return;
+    currentDirectoryHandle=handle;
+    $("#projectStatus").textContent=`保存フォルダー: ${handle.name}`;
+    try{
+      if(await ensureDirectoryPermission(handle,false)){
+        await loadFromDirectoryHandle(handle,false);
+      }else{
+        $("#projectStatus").textContent=`保存フォルダー: ${handle.name} / 再読み込みで許可`;
+      }
+    }catch(e){
+      console.warn("保存フォルダー自動復元失敗",e);
+      $("#projectStatus").textContent=`保存フォルダー: ${handle.name} / 再読み込みしてください`;
+    }
+  })();
+})();
+</script>
+</body>
+</html>
