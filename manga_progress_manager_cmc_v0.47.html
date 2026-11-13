@@ -579,7 +579,7 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     <div class="thumbOnlyToolbar" style="flex-wrap:wrap">
       <label>比較対象1（上） <select id="recordA"></select></label>
       <label>比較対象2（下） <select id="recordB"></select></label>
-      <label><input id="recordSkipSameSize" type="checkbox" style="width:auto"> 画像サイズが同じページは差分から除外</label>
+      <label><input id="recordSkipSameSize" type="checkbox" style="width:auto"> CLIPファイル容量が同じページは差分から除外</label>
       <span id="recordCount" class="small"></span>
     </div>
     <div id="recordCompare" class="recordCompare"></div>
@@ -1974,15 +1974,33 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     try{
       updateStatus("漫画フォルダー内の recordings を準備中…");
       const outputDirectory=await getRecordingOutputDirectory();
+      updateStatus("最新のCLIPファイルを確認中…");
+      const clipFiles=new Map();
+      for(const entry of await collectDirectoryFiles(currentDirectoryHandle)){
+        if(!entry.file.name.toLowerCase().endsWith(".clip"))continue;
+        clipFiles.set(normalizeName(entry.file.name),entry.file);
+        clipFiles.set(normalizeName(entry.relativePath.replace(/\\/g,"/")),entry.file);
+      }
       updateStatus("画像をWebPに変換中…");
       const pages=[];
       for(let i=0;i<project.pages.length;i++){
         const p=project.pages[i];button.textContent=`記録中 ${i+1}/${project.pages.length}`;
-        const img=p.url?await imageToWebp(p.url,.72,1400):null;
-        pages.push({id:recordingId(p),originalPage:p.pageNo,clipName:p.clipName||"",image:img?.data||null,width:img?.width||0,height:img?.height||0});
+        const file=clipFiles.get(normalizeName(p.clipName));
+        let img=null,temporaryUrl=null;
+        try{
+          let url=p.url;
+          if(file && (!p.file || file.lastModified!==p.file.lastModified || file.size!==p.file.size)){
+            const preview=extractCanvasPreview(new Uint8Array(await file.arrayBuffer()));
+            temporaryUrl=URL.createObjectURL(new Blob([preview.png],{type:"image/png"}));
+            url=temporaryUrl;
+          }
+          img=url?await imageToWebp(url,.72,1400):null;
+        }finally{if(temporaryUrl)URL.revokeObjectURL(temporaryUrl)}
+        // バイト数を保持し、表示時だけKBへ変換する。未検出は比較対象から除外しない。
+        pages.push({id:recordingId(p),originalPage:p.pageNo,clipName:p.clipName||"",clipFileSizeBytes:file?.size??null,image:img?.data||null,width:img?.width||0,height:img?.height||0});
         if(i%3===0)await new Promise(r=>setTimeout(r,0));
       }
-      const snapshot={format:"manga-page-recording",version:1,projectName:project.name,recordedAt:new Date().toISOString(),imageFormat:"image/webp",pages};
+      const snapshot={format:"manga-page-recording",version:2,projectName:project.name,recordedAt:new Date().toISOString(),imageFormat:"image/webp",pages};
       const filename=safeName(project.name)+"_recording_"+timestampName(new Date(snapshot.recordedAt))+".json";
       const payload=JSON.stringify(snapshot);
       updateStatus("JSONを書き込み中…");
@@ -2021,7 +2039,8 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     const skip=$("#recordSkipSameSize").checked;
     const selected=ids.filter(id=>{
       const p=am.get(id),q=bm.get(id);
-      return !p||!q||!skip||p.width!==q.width||p.height!==q.height;
+      const hasSize=r=>Number.isSafeInteger(r?.clipFileSizeBytes)&&r.clipFileSizeBytes>=0;
+      return !skip||!hasSize(p)||!hasSize(q)||p.clipFileSizeBytes!==q.clipFileSizeBytes;
     });
     $("#recordCount").textContent=`表示 ${selected.length} / ${ids.length}ページ`;
     if(!selected.length){target.textContent="表示対象の差分はありません。";return}
@@ -2032,7 +2051,10 @@ body.thumbUiHidden .comicPage img{max-height:100%}
         const p=map.get(id),tile=document.createElement("div");tile.className="recordTile";
         if(p?.image){const img=document.createElement("img");img.src=p.image;img.alt=id;tile.appendChild(img)}
         else{const empty=document.createElement("div");empty.className="recordMissing";empty.textContent=p?"画像なし":`ID ${id} のページが存在しない`;tile.appendChild(empty)}
-        const label=document.createElement("small");label.textContent=`${id} / ${p?"元"+p.originalPage+"P":"存在しない"}`;tile.appendChild(label);row.appendChild(tile);
+        const size=Number.isSafeInteger(p?.clipFileSizeBytes)&&p.clipFileSizeBytes>=0
+          ?`CLIP ${(p.clipFileSizeBytes/1024).toLocaleString("ja-JP",{minimumFractionDigits:2,maximumFractionDigits:2})} KB (${p.clipFileSizeBytes.toLocaleString("ja-JP")} バイト)`
+          :"CLIP容量：未記録";
+        const label=document.createElement("small");label.textContent=`${id} / ${p?"元"+p.originalPage+"P":"存在しない"} / ${size}`;tile.appendChild(label);row.appendChild(tile);
       }
       target.appendChild(row);
     };
