@@ -365,11 +365,28 @@ body.thumbUiHidden .comicPage img{max-height:100%}
 .comicPage .comicImageArea{width:var(--comic-page-width, 360px);min-width:var(--comic-page-width, 360px);flex:0 0 var(--comic-page-width, 360px)}
 .comicPage .comicImageArea img{max-width:100%;max-height:calc(100% - 28px)}
 
-.recordCompare{overflow:auto;flex:1;min-height:0;padding:14px}
+.recordCompare{overflow:auto;flex:1;min-height:0;padding:14px;--record-width:170px}
+.recordPanes{display:flex;flex-direction:column;gap:14px}
+.recordPane{min-width:0;min-height:0}
+.recordCompare.sideBySide{display:flex;flex-direction:column;overflow:hidden}
+.sideBySide .recordPanes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);flex:1;min-height:0}
+.sideBySide .recordPane{display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line);border-radius:6px;padding:8px}
+.sideBySide .recordSectionTitle{flex:0 0 auto}
+.sideBySide .recordStrip{flex:1;min-height:0;overflow:auto;align-items:flex-start}
+#recordMode .thumbOnlyToolbar label{display:inline-flex;align-items:center;gap:6px}
+#recordMode .thumbOnlyToolbar select{width:auto;max-width:min(320px,70vw)}
+.recordScrollTrack{scrollbar-color:#8993a3 #252a32;scrollbar-width:auto;background:#252a32;border:1px solid #555e6b;border-radius:4px}
+.recordScrollTrack::-webkit-scrollbar{height:16px}
+.recordScrollTrack::-webkit-scrollbar-track{background:#252a32}
+.recordScrollTrack::-webkit-scrollbar-thumb{background:#8993a3;border:2px solid #252a32;border-radius:5px}
+.recordSharedScroll{flex:0 0 auto;width:65%;margin:12px auto 0;display:flex;align-items:center;gap:10px}
+.recordSharedScroll label{white-space:nowrap;font-size:12px;color:var(--muted)}
+.recordScrollTrack{overflow-x:scroll;overflow-y:hidden;flex:1;min-width:0;height:22px}
+.recordScrollTrack > div{height:1px}
 .recordSectionTitle{font-size:14px;font-weight:700;margin:8px 0}
 .recordStrip{display:flex;gap:10px;overflow-x:auto;min-height:240px;padding:8px 0 18px;border-bottom:1px solid #424852}
-.recordTile{flex:0 0 170px;width:170px;display:flex;flex-direction:column;gap:5px;text-align:center}
-.recordTile img,.recordMissing{width:170px;height:220px;object-fit:contain;background:#101114;border:1px solid #444}
+.recordTile{flex:0 0 var(--record-width);width:var(--record-width);display:flex;flex-direction:column;gap:5px;text-align:center}
+.recordTile img,.recordMissing{width:var(--record-width);height:calc(var(--record-width) * 1.29411765);flex-shrink:0;object-fit:contain;background:#101114;border:1px solid #444}
 .recordMissing{display:flex;align-items:center;justify-content:center;padding:12px;font-size:12px;color:#c6cbd4;box-sizing:border-box;white-space:normal}
 .recordTile small{font-size:11px;color:#aeb8c5;overflow-wrap:anywhere}
 </style>
@@ -577,9 +594,13 @@ body.thumbUiHidden .comicPage img{max-height:100%}
       <input type="file" id="recordFiles" accept=".json,application/json" multiple hidden>
     </div>
     <div class="thumbOnlyToolbar" style="flex-wrap:wrap">
-      <label>比較対象1（上） <select id="recordA"></select></label>
-      <label>比較対象2（下） <select id="recordB"></select></label>
+      <label>比較対象1（上／左） <select id="recordA"></select></label>
+      <label>比較対象2（下／右） <select id="recordB"></select></label>
       <label><input id="recordSkipSameSize" type="checkbox" style="width:auto"> CLIPファイル容量が同じページは差分から除外</label>
+      <label>比較配置 <select id="recordLayout"><option value="stacked">上下</option><option value="side">左右</option></select></label>
+      <label for="recordZoom">画像サイズ</label>
+      <input id="recordZoom" type="range" min="120" max="1200" step="10" value="170">
+      <output id="recordZoomValue" for="recordZoom">170 px</output>
       <span id="recordCount" class="small"></span>
     </div>
     <div id="recordCompare" class="recordCompare"></div>
@@ -2029,8 +2050,23 @@ body.thumbUiHidden .comicPage img{max-height:100%}
   $("#recordA").onchange=renderRecordComparison;
   $("#recordB").onchange=renderRecordComparison;
   $("#recordSkipSameSize").onchange=renderRecordComparison;
+  let recordResizeObserver=null;
+  $("#recordLayout").onchange=()=>{
+    if($("#recordLayout").value==="side" && Number($("#recordZoom").value)<420)$("#recordZoom").value="420";
+    renderRecordComparison();
+  };
+  $("#recordZoom").oninput=renderRecordComparison;
   function renderRecordComparison(){
-    const target=$("#recordCompare");target.replaceChildren();
+    const target=$("#recordCompare");
+    const previous=target.querySelector(".recordStrip");
+    const position=previous&&previous.scrollWidth>previous.clientWidth?previous.scrollLeft/(previous.scrollWidth-previous.clientWidth):0;
+    const top=previous?.scrollTop||0;
+    recordResizeObserver?.disconnect();
+    target.replaceChildren();
+    const side=$("#recordLayout").value==="side";
+    target.classList.toggle("sideBySide",side);
+    target.style.setProperty("--record-width",$("#recordZoom").value+"px");
+    $("#recordZoomValue").textContent=$("#recordZoom").value+" px";
     if(recordings.length<2){target.textContent="比較するには、異なる日時のレコーディングを2件読み込むか保存してください。";$("#recordCount").textContent="";return}
     const a=recordings[Number($("#recordA").value)],b=recordings[Number($("#recordB").value)];
     if(!a||!b)return;
@@ -2044,8 +2080,10 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     });
     $("#recordCount").textContent=`表示 ${selected.length} / ${ids.length}ページ`;
     if(!selected.length){target.textContent="表示対象の差分はありません。";return}
+    const panes=document.createElement("div");panes.className="recordPanes";target.appendChild(panes);
     const makeRow=(snapshot,map,title)=>{
-      const h=document.createElement("div");h.className="recordSectionTitle";h.textContent=title+"："+recordingLabel(snapshot);target.appendChild(h);
+      const pane=document.createElement("section");pane.className="recordPane";panes.appendChild(pane);
+      const h=document.createElement("div");h.className="recordSectionTitle";h.textContent=title+"："+recordingLabel(snapshot);pane.appendChild(h);
       const row=document.createElement("div");row.className="recordStrip";
       for(const id of selected){
         const p=map.get(id),tile=document.createElement("div");tile.className="recordTile";
@@ -2056,13 +2094,46 @@ body.thumbUiHidden .comicPage img{max-height:100%}
           :"CLIP容量：未記録";
         const label=document.createElement("small");label.textContent=`${id} / ${p?"元"+p.originalPage+"P":"存在しない"} / ${size}`;tile.appendChild(label);row.appendChild(tile);
       }
-      target.appendChild(row);
+      pane.appendChild(row);
     };
-    makeRow(a,am,"上・比較対象1");makeRow(b,bm,"下・比較対象2");
-    // 上下の同じ列が同じIDになるように、横スクロール位置を同期。
-    const rows=target.querySelectorAll(".recordStrip");
-    let syncing=false;
-    rows.forEach((row,i)=>row.addEventListener("scroll",()=>{if(syncing)return;syncing=true;rows[1-i].scrollLeft=row.scrollLeft;requestAnimationFrame(()=>syncing=false)}));
+    makeRow(a,am,(side?"左":"上")+"・比較対象1");makeRow(b,bm,(side?"右":"下")+"・比較対象2");
+    const rows=[...target.querySelectorAll(".recordStrip")];
+    let track=null,spacer=null;
+    if(side){
+      const control=document.createElement("div");control.className="recordSharedScroll";
+      const label=document.createElement("label");label.textContent="左右共通スクロール";label.htmlFor="recordScrollTrack";
+      track=document.createElement("div");track.className="recordScrollTrack";track.id="recordScrollTrack";
+      track.tabIndex=0;track.setAttribute("role","region");track.setAttribute("aria-label","左右共通スクロール");
+      spacer=document.createElement("div");track.appendChild(spacer);control.append(label,track);target.appendChild(control);
+    }
+    // 同じ幅のページ列を同じ割合で移動し、両端でも対応するページを揃える。
+    let horizontal=position,vertical=top;
+    const apply=()=>{
+      for(const row of rows){
+        row.scrollLeft=horizontal*Math.max(0,row.scrollWidth-row.clientWidth);
+        if(side)row.scrollTop=vertical;
+      }
+      if(track)track.scrollLeft=horizontal*Math.max(0,track.scrollWidth-track.clientWidth);
+    };
+    for(const row of rows)row.addEventListener("scroll",()=>{
+      const expected=horizontal*Math.max(0,row.scrollWidth-row.clientWidth);
+      if(Math.abs(row.scrollLeft-expected)<1 && (!side||Math.abs(row.scrollTop-vertical)<1))return;
+      horizontal=row.scrollLeft/Math.max(1,row.scrollWidth-row.clientWidth);
+      if(side)vertical=row.scrollTop;
+      apply();
+    });
+    if(track)track.addEventListener("scroll",()=>{
+      if(Math.abs(track.scrollLeft-horizontal*(track.scrollWidth-track.clientWidth))<1)return;
+      horizontal=track.scrollLeft/Math.max(1,track.scrollWidth-track.clientWidth);apply();
+    });
+    const resize=()=>{
+      if(spacer)spacer.style.width=(track.clientWidth+Math.max(...rows.map(row=>row.scrollWidth-row.clientWidth),0))+"px";
+      apply();
+    };
+    recordResizeObserver=new ResizeObserver(resize);
+    rows.forEach(row=>recordResizeObserver.observe(row));
+    if(track)recordResizeObserver.observe(track);
+    resize();
   }
 
   const PANE_WIDTH_KEY="mangaProgress:selectedPaneWidth";
