@@ -1200,6 +1200,8 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     selectedPageNo=project.pages[0]?.pageNo||null;
     renderBase();
 
+    await loadProjectRecordings(entries);
+
     // 順番に抽出。UIを固めないよう時々yield。
     for(let i=0;i<project.pages.length;i++){
       const p=project.pages[i];
@@ -1974,18 +1976,40 @@ body.thumbUiHidden .comicPage img{max-height:100%}
   function recordingId(p){return String(p.recordingId||p.progressKey||("node:"+p.cmcNodeId))}
   function timestampName(d){return d.toISOString().replace(/[:.]/g,"-")}
   function recordingLabel(d){return `${d.projectName||"作品"} / ${new Date(d.recordedAt).toLocaleString("ja-JP")} (${d.pages.length}P)`}
-  function addRecording(d){
+  function addRecording(d,update=true){
     if(!d||d.format!=="manga-page-recording"||!Array.isArray(d.pages))throw Error("レコーディングJSONではありません");
+    if(typeof d.recordedAt!=="string" || !Number.isFinite(Date.parse(d.recordedAt)))throw Error("記録日時が不正です");
     if(d.pages.length>2000)throw Error("ページ数が多すぎます");
     for(const p of d.pages){if(typeof p.id!=="string"||!p.id||p.image!==null&&p.image!==undefined&&!/^data:image\/webp;base64,[A-Za-z0-9+/=]+$/.test(p.image))throw Error("ページIDまたは画像形式が不正です")}
     if(recordings.some(x=>x.recordedAt===d.recordedAt&&x.projectName===d.projectName))return;
+    const selectedA=recordings[Number($("#recordA").value)],selectedB=recordings[Number($("#recordB").value)];
     recordings.push(d);recordings.sort((a,b)=>a.recordedAt.localeCompare(b.recordedAt));
-    const selectedA=$("#recordA").value,selectedB=$("#recordB").value;
+    if(update)updateRecordingChoices(selectedA,selectedB);
+  }
+  function updateRecordingChoices(selectedA,selectedB){
     for(const id of ["recordA","recordB"]){const el=$("#"+id);el.replaceChildren();recordings.forEach((r,i)=>{const op=document.createElement("option");op.value=String(i);op.textContent=recordingLabel(r);el.appendChild(op)})}
-    $("#recordA").value=selectedA&&Number(selectedA)<recordings.length?selectedA:String(Math.max(0,recordings.length-2));
-    $("#recordB").value=selectedB&&Number(selectedB)<recordings.length?selectedB:String(recordings.length-1);
+    const a=recordings.indexOf(selectedA),b=recordings.indexOf(selectedB);
+    $("#recordA").value=String(a>=0?a:Math.max(0,recordings.length-2));
+    $("#recordB").value=String(b>=0?b:Math.max(0,recordings.length-1));
     renderRecordComparison();
   }
+  async function loadProjectRecordings(entries){
+    // 作品を切り替えたときに、前の作品の記録を残さない。
+    recordings.length=0;
+    updateRecordingChoices();
+    let failed=0;
+    for(const entry of entries){
+      let path=entry.relativePath.replace(/\\/g,"/");
+      // webkitdirectoryでは先頭に選択した作品フォルダー名が付く。
+      if(entry.file.webkitRelativePath)path=path.slice(path.indexOf("/")+1);
+      if(!path.startsWith("recordings/") || !entry.file.name.toLowerCase().endsWith(".json"))continue;
+      try{addRecording(JSON.parse(await entry.file.text()),false)}
+      catch(e){failed++;console.warn("レコーディング自動読込失敗",entry.file.name,e)}
+    }
+    updateRecordingChoices();
+    $("#recordStatus").textContent=`レコーディング自動読込：${recordings.length}件`+(failed?`（読込失敗 ${failed}件）`:"");
+  }
+
   $("#recordCapture").onclick=async()=>{
     if(!project.pages.length){alert("先に作品を読み込んでください");return}
     const button=$("#recordCapture");button.disabled=true;
