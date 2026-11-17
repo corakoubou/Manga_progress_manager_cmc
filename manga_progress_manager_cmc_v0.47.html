@@ -389,7 +389,9 @@ body.thumbUiHidden .comicPage img{max-height:100%}
 .recordTile img,.recordMissing{width:var(--record-width);height:calc(var(--record-width) * 1.29411765);flex-shrink:0;object-fit:contain;background:#101114;border:1px solid #444}
 .recordMissing{display:flex;align-items:center;justify-content:center;padding:12px;font-size:12px;color:#c6cbd4;box-sizing:border-box;white-space:normal}
 .recordTile small{font-size:11px;color:#aeb8c5;overflow-wrap:anywhere}
-.taskRow{display:flex;align-items:center;gap:6px;margin-top:8px;min-width:300px}.taskRow input[type="checkbox"]{width:auto;flex:none}.taskRow input[type="text"]{min-width:90px;flex:1}.taskRow button{white-space:nowrap}.taskRow .small{min-width:34px}#workTable{overflow-x:auto;padding-bottom:8px}
+.taskRow{display:flex;align-items:center;gap:6px;min-height:42px;position:relative;min-width:430px;border-top:2px solid transparent;border-bottom:2px solid transparent}
+.taskRow input[type="checkbox"]{width:auto;flex:none}.taskRow input[type="text"]{min-width:85px;flex:1}.taskRow button{white-space:nowrap;padding:5px 7px}.taskToggle,.taskToggleSpace{width:24px;flex:0 0 24px}.taskToggle{padding:2px!important}.taskDrag{cursor:grab;color:var(--muted);flex:none}.taskChildren{margin-left:30px;border-left:1px solid #727b8a;padding-left:18px}.taskChildren[hidden]{display:none}.taskChildren>.taskNode>.taskRow:before{content:"";position:absolute;left:-19px;top:50%;width:18px;border-top:1px solid #727b8a}.taskNode{position:relative}.taskPercent{display:flex;align-items:center;gap:3px}.taskPercent input{width:65px;padding:5px}.taskAuto{min-width:42px;text-align:right}.taskMeter{width:45px;height:5px;background:var(--line);flex:none;border-radius:3px;overflow:hidden}.taskMeter>span{display:block;height:100%;background:var(--ok)}.taskRow.dropBefore{border-top-color:var(--ok)}.taskRow.dropAfter{border-bottom-color:var(--ok)}#workTable{overflow-x:auto;padding-bottom:8px}.taskTitle{flex:1;min-width:90px;overflow-wrap:anywhere}.taskOverviewPage{display:grid;grid-template-columns:140px minmax(0,1fr);gap:20px;padding:18px 0;border-bottom:1px solid var(--line)}.taskOverviewThumb{display:flex;flex-direction:column;gap:8px;align-items:center}.taskOverviewThumb img{max-width:140px;max-height:220px;object-fit:contain}.taskOverviewTree{overflow:auto;padding:0 8px 8px 0}.taskOverviewTree .taskRow{min-width:260px}.taskSearchBar{display:flex;align-items:center;gap:12px;position:sticky;top:0;background:var(--panel);padding:12px 0;z-index:2}.taskSearchBar input{flex:1;min-width:140px}.taskSearchBar select{width:auto}.taskSearchBar .small{white-space:nowrap}@media(max-width:600px){.taskOverviewPage{grid-template-columns:85px minmax(0,1fr);gap:10px}.taskOverviewThumb img{max-width:85px}.taskSearchBar{flex-wrap:wrap}}
+
 </style>
 </head>
 <body>
@@ -478,7 +480,7 @@ body.thumbUiHidden .comicPage img{max-height:100%}
             </select>
           </div>
           <div class="field">
-            <label>ページ全体進捗（末端タスクの完了率）</label>
+            <label>ページ全体進捗（末端タスクの平均）</label>
             <div class="overallProgressBox">
               <div class="overallProgressValue" id="overallProgressValue">0%</div>
               <div class="progressOuter"><div class="progressInner" id="pageProgressBar"></div></div>
@@ -488,7 +490,7 @@ body.thumbUiHidden .comicPage img{max-height:100%}
 
         <div class="field">
           <label>タスク（主題 → 詳細 → さらに詳細）</label>
-          <p class="small">末端タスクの完了数から進捗を計算します。子タスクは階層制限なく追加できます。</p>
+          <p class="small">末端タスクの％を入力できます。親は配下の末端タスクの平均です。⋮⋮をドラッグすると同じ親の中で上下に移動できます。</p>
           <button id="addRootTask" type="button">＋ 主題を追加</button>
           <div class="workTable" id="workTable"></div>
         </div>
@@ -618,6 +620,15 @@ body.thumbUiHidden .comicPage img{max-height:100%}
       </div>
 
       <div class="statusLine" id="stHoldNote" style="margin-top:9px"></div>
+
+      <div class="statsSectionTitle">作業タスク閲覧モード</div>
+      <div class="taskSearchBar">
+        <input id="taskSearch" aria-label="タスクを絞り込み" placeholder="タスク名を部分一致で検索（複数語はスペース区切り）">
+        <select id="taskSearchMode" aria-label="検索条件"><option value="or">OR（いずれか）</option><option value="and">AND（すべて）</option></select>
+        <span id="taskSearchCount" class="small"></span>
+      </div>
+      <p class="small">主題から子タスクまでの名前を検索します。例：AND「1コマ 線画」。一致したタスクとその親・子を表示します。全体進捗は絞り込みに影響されません。</p>
+      <div id="taskOverview"></div>
 
 
     </div>
@@ -1044,17 +1055,17 @@ body.thumbUiHidden .comicPage img{max-height:100%}
       children.get(t.parentId).push(t);
     }
     const stack=root?[root]:(children.get(null)||[]).slice();
-    let total=0,done=0;
+    let total=0,done=0,sum=0;
     while(stack.length){
       const t=stack.pop(), sub=children.get(t.id);
       if(sub?.length){for(const child of sub)stack.push(child)}
-      else {total++;if(t.done)done++}
+      else {total++;sum+=t.percent;if(t.percent===100)done++}
     }
-    return {total,done};
+    return {total,done,sum};
   }
   function calcOverallProgress(rec){
-    const {total,done}=taskCounts(rec);
-    return total?Math.round(done/total*100):0;
+    const {total,sum}=taskCounts(rec);
+    return total?Math.round(sum/total):0;
   }
   function migrateRecord(rec){
     if(!rec||typeof rec!=="object"||Array.isArray(rec))return defaultProgress();
@@ -1066,16 +1077,16 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     for(const t of rec.tasks){
       if(!t||typeof t.id!=="string"||ids.has(t.id))continue;
       if(t.parentId!==null&&!ids.has(t.parentId))continue;
-      ids.add(t.id);valid.push({id:t.id,parentId:t.parentId,title:String(t.title||"タスク"),done:t.done===true});
+      ids.add(t.id);Object.assign(t,{title:String(t.title||"タスク"),percent:Math.max(0,Math.min(100,Number.isFinite(Number(t.percent))?Number(t.percent):(t.done?100:0))),collapsed:t.collapsed===true});delete t.done;valid.push(t);
     }
     rec.tasks=valid;
     syncPageStatus(rec);
     return rec;
   }
   function syncPageStatus(rec){
-    const {total,done}=taskCounts(rec);
+    const {total,done,sum}=taskCounts(rec);
     rec.progress=calcOverallProgress(rec);
-    if(rec.status!=="保留")rec.status=total&&done===total?"完了":done?"作業中":"未着手";
+    if(rec.status!=="保留")rec.status=total&&done===total?"完了":sum>0?"作業中":"未着手";
   }
   function storageKey(){return "mangaProgress:cmc:v02:"+(project.name||"unknown")}
   function getRec(page){
@@ -1091,9 +1102,9 @@ body.thumbUiHidden .comicPage img{max-height:100%}
   }
   function currentOverallProgress(){
     const included=project.pages.filter(p=>getRec(p).status!=="保留");
-    let total=0,done=0;
-    for(const p of included){const c=taskCounts(getRec(p));total+=c.total;done+=c.done}
-    return total?done/total*100:0;
+    let total=0,sum=0;
+    for(const p of included){const c=taskCounts(getRec(p));total+=c.total;sum+=c.sum}
+    return total?sum/total:0;
   }
   function ensureHistoryBaseline(){
     if(!project.name||!project.pages.length||progressHistory.length)return;
@@ -1280,7 +1291,7 @@ body.thumbUiHidden .comicPage img{max-height:100%}
       <div class="workChips">
         ${r.tasks.filter(t=>t.parentId===null).map(t=>{
           const c=taskCounts(r,t);
-          return `<span class="workChip">${esc(t.title)} ${c.total?Math.round(c.done/c.total*100):0}%</span>`;
+          return `<span class="workChip">${esc(t.title)} ${c.total?Math.round(c.sum/c.total):0}%</span>`;
         }).join("") || `<span class="workChip">タスク未設定</span>`}
       </div>
       <div class="fileName" title="${esc(p.linkPath)}">${esc(p.clipName)}</div>`;
@@ -1343,7 +1354,7 @@ body.thumbUiHidden .comicPage img{max-height:100%}
   function addTask(p,rec,parentId){
     const title=prompt(parentId===null?"主題を入力（例：1コマ目）":"子タスクを入力（例：線画、背景、キャラクター1）");
     if(!title?.trim())return;
-    const task={id:crypto.randomUUID(),parentId,title:title.trim(),done:false};
+    const task={id:crypto.randomUUID(),parentId,title:title.trim(),percent:0,collapsed:false};
     if(parentId===null)rec.tasks.push(task);
     else {
       // Insert after the parent's complete subtree to preserve sibling order.
@@ -1354,40 +1365,113 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     }
     commitTasks(p,rec);
   }
-  function renderTasks(p,rec){
-    const wt=$("#workTable");wt.innerHTML="";
-    $("#addRootTask").onclick=()=>addTask(p,rec,null);
-    if(!rec.tasks.length)wt.innerHTML='<p class="small">主題を追加して、やることを順に登録してください。</p>';
-    const depth=new Map();
+  let draggedTask=null;
+  function taskSubtreeIds(rec,id){
+    const ids=new Set([id]);
+    for(const node of rec.tasks)if(ids.has(node.parentId))ids.add(node.id);
+    return ids;
+  }
+  function moveTask(rec,sourceId,targetId,after){
+    const source=rec.tasks.find(t=>t.id===sourceId),target=rec.tasks.find(t=>t.id===targetId);
+    if(!source||!target||source===target||source.parentId!==target.parentId)return false;
+    const ids=taskSubtreeIds(rec,sourceId),block=rec.tasks.filter(t=>ids.has(t.id));
+    const remaining=rec.tasks.filter(t=>!ids.has(t.id));
+    let at=remaining.findIndex(t=>t.id===targetId);
+    if(after){const targetIds=taskSubtreeIds(rec,targetId);while(at<remaining.length&&targetIds.has(remaining[at].id))at++}
+    rec.tasks=[...remaining.slice(0,at),...block,...remaining.slice(at)];return true;
+  }
+  function renderTaskTree(container,p,rec,editable=true,visibleIds=null){
+    container.innerHTML="";
+    const groups=new Map([[null,container]]),items=new Map();
+    const parents=new Set(rec.tasks.map(t=>t.parentId));
     for(const t of rec.tasks){
-      const level=t.parentId===null?0:(depth.get(t.parentId)||0)+1;depth.set(t.id,level);
-      const c=taskCounts(rec,t), row=document.createElement("div");row.className="taskRow";
-      row.style.marginLeft=(Math.min(level,12)*16)+"px";
-      row.innerHTML=`<input type="checkbox" aria-label="${esc(t.title)}を完了" ${c.done===c.total?'checked':''}>
-        <input type="text" aria-label="タスク名" value="${esc(t.title)}">
-        <span class="small">${Math.round(c.done/c.total*100)}%</span>
-        <button type="button" data-action="add">＋ 子</button><button type="button" data-action="delete">削除</button>`;
-      const checkbox=row.querySelector('[type="checkbox"]');checkbox.indeterminate=c.done>0&&c.done<c.total;
+      if(visibleIds&&!visibleIds.has(t.id))continue;
+      const host=groups.get(t.parentId);if(!host)continue;
+      const item=document.createElement("div");item.className="taskNode";item.dataset.taskId=t.id;
+      const row=document.createElement("div");row.className="taskRow";row.dataset.taskId=t.id;
+      const c=taskCounts(rec,t),pct=Math.round(c.sum/c.total),hasChildren=parents.has(t.id);
+      row.innerHTML=`${editable?'<span class="taskDrag" draggable="true" title="ドラッグして同じ親の中で並べ替え" aria-label="並べ替え">⋮⋮</span>':''}
+        ${hasChildren?`<button type="button" class="taskToggle" aria-label="${esc(t.title)}を開閉" aria-expanded="${!t.collapsed}">${t.collapsed?'▸':'▾'}</button>`:'<span class="taskToggleSpace"></span>'}
+        <input type="checkbox" aria-label="${esc(t.title)}を完了" ${c.done===c.total?'checked':''} ${editable?'':'disabled'}>
+        ${editable?`<input type="text" aria-label="タスク名" value="${esc(t.title)}">`:`<span class="taskTitle">${esc(t.title)}</span>`}
+        ${editable&&!hasChildren?`<label class="taskPercent"><input type="number" min="0" max="100" step="1" aria-label="${esc(t.title)}の進捗率" value="${t.percent}">%</label>`:`<span class="taskAuto" title="配下の末端タスクの平均">${pct}%</span>`}
+        <span class="taskMeter"><span style="width:${pct}%"></span></span>
+        ${editable?'<button type="button" data-action="add">＋ 子</button><button type="button" data-action="delete">削除</button>':''}`;
+      const checkbox=row.querySelector('[type="checkbox"]');checkbox.indeterminate=c.sum>0&&c.done<c.total;
+      const children=document.createElement("div");children.className="taskChildren";children.hidden=t.collapsed&&!visibleIds;
+      const toggle=row.querySelector('.taskToggle');
+      if(toggle)toggle.onclick=()=>{
+        t.collapsed=!children.hidden;children.hidden=t.collapsed;toggle.textContent=t.collapsed?'▸':'▾';toggle.setAttribute('aria-expanded',String(!t.collapsed));saveProgress();
+      };
+      if(toggle&&visibleIds){toggle.textContent='▾';toggle.setAttribute('aria-expanded','true')}
+      item.append(row,children);host.appendChild(item);groups.set(t.id,children);items.set(t.id,item);
+      if(!editable)continue;
       checkbox.onchange=()=>{
-        const ids=new Set([t.id]);
-        for(const node of rec.tasks)if(ids.has(node.id)||ids.has(node.parentId)){ids.add(node.id);node.done=checkbox.checked}
+        const ids=taskSubtreeIds(rec,t.id);for(const node of rec.tasks)if(ids.has(node.id))node.percent=checkbox.checked?100:0;
         commitTasks(p,rec);
       };
       row.querySelector('[type="text"]').onchange=e=>{t.title=e.target.value.trim()||t.title;commitTasks(p,rec)};
-      row.querySelector('[data-action="add"]').onclick=()=>addTask(p,rec,t.id);
+      const number=row.querySelector('[type="number"]');
+      if(number)number.onchange=()=>{const val=Number(number.value);t.percent=Math.max(0,Math.min(100,Number.isFinite(val)?val:0));commitTasks(p,rec)};
+      row.querySelector('[data-action="add"]').onclick=()=>{t.collapsed=false;addTask(p,rec,t.id)};
       row.querySelector('[data-action="delete"]').onclick=()=>{
         if(!confirm(`「${t.title}」と配下の子タスクを削除しますか？`))return;
-        const ids=new Set([t.id]);for(const node of rec.tasks)if(ids.has(node.parentId))ids.add(node.id);
-        rec.tasks=rec.tasks.filter(node=>!ids.has(node.id));commitTasks(p,rec);
+        const ids=taskSubtreeIds(rec,t.id);rec.tasks=rec.tasks.filter(node=>!ids.has(node.id));commitTasks(p,rec);
       };
-      wt.appendChild(row);
+      row.querySelector('.taskDrag').ondragstart=e=>{draggedTask={page:p.progressKey,id:t.id};e.dataTransfer.setData('text/plain',t.id);e.dataTransfer.effectAllowed='move'};
+      row.querySelector('.taskDrag').ondragend=()=>{draggedTask=null;container.querySelectorAll('.dropBefore,.dropAfter').forEach(el=>el.classList.remove('dropBefore','dropAfter'))};
+      row.ondragover=e=>{
+        const source=rec.tasks.find(n=>n.id===draggedTask?.id);
+        if(draggedTask?.page!==p.progressKey||!source||source.id===t.id||source.parentId!==t.parentId)return;
+        e.preventDefault();e.dataTransfer.dropEffect='move';const after=e.clientY>row.getBoundingClientRect().top+row.offsetHeight/2;
+        row.classList.toggle('dropAfter',after);row.classList.toggle('dropBefore',!after);
+      };
+      row.ondragleave=()=>row.classList.remove('dropBefore','dropAfter');
+      row.ondrop=e=>{
+        e.preventDefault();const source=draggedTask;draggedTask=null;
+        const after=e.clientY>row.getBoundingClientRect().top+row.offsetHeight/2;
+        if(source?.page===p.progressKey&&moveTask(rec,source.id,t.id,after))commitTasks(p,rec);
+      };
     }
+  }
+  function renderTasks(p,rec){
+    const wt=$("#workTable");renderTaskTree(wt,p,rec);
+    $("#addRootTask").onclick=()=>addTask(p,rec,null);
+    if(!rec.tasks.length)wt.innerHTML='<p class="small">主題を追加して、やることを順に登録してください。</p>';
+  }
+  function renderTaskOverview(){
+    const container=$("#taskOverview");container.innerHTML="";
+    const terms=$("#taskSearch").value.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
+    const useAnd=$("#taskSearchMode").value==='and';let count=0;
+    for(const p of project.pages){
+      const rec=getRec(p),paths=new Map(),matches=new Set();
+      for(const t of rec.tasks){
+        const path=(paths.get(t.parentId)||'')+' / '+t.title.toLocaleLowerCase();paths.set(t.id,path);
+        if(terms.length&&(useAnd?terms.every(term=>path.includes(term)):terms.some(term=>path.includes(term))))matches.add(t.id);
+      }
+      if(terms.length&&!matches.size)continue;
+      let visible=null;
+      if(terms.length){
+        visible=new Set(matches);const byId=new Map(rec.tasks.map(t=>[t.id,t]));
+        for(const id of matches){let t=byId.get(id);while(t?.parentId!==null&&t){visible.add(t.parentId);t=byId.get(t.parentId)}}
+        // Matching parents include their descendants, preserving useful context.
+        for(const t of rec.tasks)if(matches.has(t.parentId))matches.add(t.id);
+        for(const id of matches)visible.add(id);
+      }
+      const entry=document.createElement('div');entry.className='taskOverviewPage';
+      entry.innerHTML=`<div class="taskOverviewThumb">${p.url?`<img src="${p.url}" alt="${p.pageNo}ページ">`:'<div class="small">プレビューなし</div>'}<b>${p.pageNo}ページ</b><span>${rec.progress}%・${esc(rec.status)}</span></div><div class="taskOverviewTree"></div>`;
+      const tree=entry.querySelector('.taskOverviewTree');renderTaskTree(tree,p,rec,false,visible);
+      if(!rec.tasks.length)tree.textContent='タスク未設定';
+      container.appendChild(entry);count++;
+    }
+    $("#taskSearchCount").textContent=`${count} / ${project.pages.length}ページ`;
+    if(!count)container.innerHTML='<div class="empty">条件に一致するタスクがありません。</div>';
   }
   function updateField(field,value){
     const p=selectedPage();if(!p)return;
     const r=getRec(p);r[field]=value;
     if(field==="status"){
-      if(value==="完了"||value==="未着手")for(const t of r.tasks)t.done=value==="完了";
+      if(value==="完了"||value==="未着手")for(const t of r.tasks)t.percent=value==="完了"?100:0;
       syncPageStatus(r);
     }
     saveProgressWithHistory();renderBase();
@@ -1429,7 +1513,8 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     const overall=Math.round(currentOverallProgress());
     $("#stOverallPct").textContent=overall+"%";
     $("#stOverallBar").style.width=overall+"%";
-    $("#stHoldNote").textContent="末端タスクの完了数 ÷ 全末端タスク数。タスク未設定ページと保留ページは計算対象外です。";
+    renderTaskOverview();
+    $("#stHoldNote").textContent="末端タスクの進捗率の平均。タスク未設定ページと保留ページは計算対象外です。";
   }
 
   // ページの実体はcmcNodeIdで識別。変更順は表示専用でファイルを書き換えない。
@@ -1772,7 +1857,7 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     if(!thumbs)document.body.classList.remove("thumbUiHidden");
     $("#manageMode").classList.toggle("hidden",!manage);$("#statsMode").classList.toggle("hidden",!stats);$("#thumbMode").classList.toggle("hidden",!thumbs);$("#orderMode").classList.toggle("hidden",!order);$("#recordMode").classList.toggle("hidden",!record);
     $("#modeManage").classList.toggle("active",manage);$("#modeStats").classList.toggle("active",stats);$("#modeThumbs").classList.toggle("active",thumbs);$("#modeOrder").classList.toggle("active",order);$("#modeRecord").classList.toggle("active",record);
-    if(order)renderOrderMaker();if(record)renderRecordComparison();if(stats)buildStatistics();if(thumbs){if(comicMode)renderComic();else renderThumbOnly();}
+    if(manage)renderEditor();if(order)renderOrderMaker();if(record)renderRecordComparison();if(stats)buildStatistics();if(thumbs){if(comicMode)renderComic();else renderThumbOnly();}
   }
   $("#modeManage").onclick=()=>setMode("manage");
   $("#modeStats").onclick=()=>setMode("stats");
@@ -2069,6 +2154,8 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     e.target.value="";
   };
 
+  $("#taskSearch").oninput=renderTaskOverview;
+  $("#taskSearchMode").onchange=renderTaskOverview;
   $("#search").oninput=renderGrid;
   $("#statusFilter").onchange=renderGrid;
   $("#thumbSize").onchange=renderGrid;
