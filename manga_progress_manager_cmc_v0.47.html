@@ -1352,8 +1352,7 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     syncPageStatus(rec);saveProgressWithHistory();renderBase();
   }
   function addTask(p,rec,parentId){
-    const title=prompt(parentId===null?"主題を入力（例：1コマ目）":"子タスクを入力（例：線画、背景、キャラクター1）");
-    if(!title?.trim())return;
+    const title=parentId===null?"新しい主題":"新しい子タスク";
     const task={id:crypto.randomUUID(),parentId,title:title.trim(),percent:0,collapsed:false};
     if(parentId===null)rec.tasks.push(task);
     else {
@@ -1364,6 +1363,8 @@ body.thumbUiHidden .comicPage img{max-height:100%}
       rec.tasks.splice(at,0,task);
     }
     commitTasks(p,rec);
+    const input=document.querySelector(`#workTable .taskRow[data-task-id="${task.id}"] input[type="text"]`);
+    if(input){input.scrollIntoView({block:"nearest",inline:"nearest"});input.focus();input.select()}
   }
   let draggedTask=null;
   function taskSubtreeIds(rec,id){
@@ -1410,7 +1411,10 @@ body.thumbUiHidden .comicPage img{max-height:100%}
         const ids=taskSubtreeIds(rec,t.id);for(const node of rec.tasks)if(ids.has(node.id))node.percent=checkbox.checked?100:0;
         commitTasks(p,rec);
       };
-      row.querySelector('[type="text"]').onchange=e=>{t.title=e.target.value.trim()||t.title;commitTasks(p,rec)};
+      const titleInput=row.querySelector('[type="text"]');
+      titleInput.oninput=()=>{t.title=titleInput.value.trim()||"タスク";saveProgress();renderGrid()};
+      titleInput.onblur=()=>{titleInput.value=t.title};
+      titleInput.onkeydown=e=>{if(e.key==="Enter"&&!e.isComposing){e.preventDefault();titleInput.blur()}};
       const number=row.querySelector('[type="number"]');
       if(number)number.onchange=()=>{const val=Number(number.value);t.percent=Math.max(0,Math.min(100,Number.isFinite(val)?val:0));commitTasks(p,rec)};
       row.querySelector('[data-action="add"]').onclick=()=>{t.collapsed=false;addTask(p,rec,t.id)};
