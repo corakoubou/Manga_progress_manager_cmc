@@ -389,6 +389,7 @@ body.thumbUiHidden .comicPage img{max-height:100%}
 .recordTile img,.recordMissing{width:var(--record-width);height:calc(var(--record-width) * 1.29411765);flex-shrink:0;object-fit:contain;background:#101114;border:1px solid #444}
 .recordMissing{display:flex;align-items:center;justify-content:center;padding:12px;font-size:12px;color:#c6cbd4;box-sizing:border-box;white-space:normal}
 .recordTile small{font-size:11px;color:#aeb8c5;overflow-wrap:anywhere}
+.taskRow{display:flex;align-items:center;gap:6px;margin-top:8px;min-width:300px}.taskRow input[type="checkbox"]{width:auto;flex:none}.taskRow input[type="text"]{min-width:90px;flex:1}.taskRow button{white-space:nowrap}.taskRow .small{min-width:34px}#workTable{overflow-x:auto;padding-bottom:8px}
 </style>
 </head>
 <body>
@@ -446,17 +447,7 @@ body.thumbUiHidden .comicPage img{max-height:100%}
         </select>
       </div>
 
-      <div class="workFilterBox" id="workFilterBox">
-        <span class="workFilterTitle">現在の作業で絞り込み：</span>
-        <label class="workFilterItem"><input type="checkbox" value="ネーム">ネーム</label>
-        <label class="workFilterItem"><input type="checkbox" value="下書き">下書き</label>
-        <label class="workFilterItem"><input type="checkbox" value="線画">線画</label>
-        <label class="workFilterItem"><input type="checkbox" value="擬音・効果音">擬音・効果音</label>
-        <label class="workFilterItem"><input type="checkbox" value="色塗り">色塗り</label>
-        <label class="workFilterItem"><input type="checkbox" value="テキスト">テキスト</label>
-        <label class="workFilterItem"><input type="checkbox" value="仕上げ">仕上げ</label>
-        <button class="workFilterClear" id="clearWorkFilter">解除</button>
-      </div>
+
 
       <div id="pageGrid" class="pageGrid">
         <div class="empty">作品フォルダーを読み込んでください。</div>
@@ -487,7 +478,7 @@ body.thumbUiHidden .comicPage img{max-height:100%}
             </select>
           </div>
           <div class="field">
-            <label>ページ全体進捗（7工程平均）</label>
+            <label>ページ全体進捗（末端タスクの完了率）</label>
             <div class="overallProgressBox">
               <div class="overallProgressValue" id="overallProgressValue">0%</div>
               <div class="progressOuter"><div class="progressInner" id="pageProgressBar"></div></div>
@@ -496,7 +487,9 @@ body.thumbUiHidden .comicPage img{max-height:100%}
         </div>
 
         <div class="field">
-          <label>作業工程</label>
+          <label>タスク（主題 → 詳細 → さらに詳細）</label>
+          <p class="small">末端タスクの完了数から進捗を計算します。子タスクは階層制限なく追加できます。</p>
+          <button id="addRootTask" type="button">＋ 主題を追加</button>
           <div class="workTable" id="workTable"></div>
         </div>
 
@@ -618,35 +611,15 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     <div id="statsEmpty" class="statsEmpty">作品フォルダーを読み込むと統計を表示します。</div>
 
     <div id="statsContent" class="hidden">
-      <div class="statsTop">
-        <div class="statsCard"><div class="label">総ページ</div><div class="value" id="stTotal">0</div></div>
-        <div class="statsCard"><div class="label">残りページ</div><div class="value" id="stRemaining">0</div></div>
-        <div class="statsCard"><div class="label">完了ページ</div><div class="value" id="stDone">0</div></div>
-        <div class="statsCard"><div class="label">作業中ページ</div><div class="value" id="stWorking">0</div></div>
-        <div class="statsCard"><div class="label">未着手ページ</div><div class="value" id="stUnstarted">0</div></div>
-        <div class="statsCard"><div class="label">合計作業時間</div><div class="value" id="stWorkTime">0時間00分</div><div class="statusLine" id="stWorkTimeHours">0.00時間</div></div>
-      </div>
-
       <div class="statsCard">
-        <div class="label">作品全体平均進捗</div>
+        <div class="label">作品全体進捗</div>
         <div class="value" id="stOverallPct">0%</div>
         <div class="statsBar"><div id="stOverallBar"></div></div>
       </div>
 
       <div class="statusLine" id="stHoldNote" style="margin-top:9px"></div>
 
-      <div class="statsSectionTitle">進捗履歴</div>
-      <div class="statsCard">
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
-          <select id="historyMetric"><option value="cumulative">累積進捗</option><option value="daily">日別進捗</option></select>
-          <select id="historyPeriod"><option value="7">直近7日</option><option value="30" selected>直近30日</option><option value="all">全期間</option></select>
-          <span class="small" id="historyCaption"></span>
-        </div>
-        <div style="overflow-x:auto"><svg id="historyChart" role="img" aria-label="進捗履歴グラフ" style="display:block;width:100%;min-width:440px;height:280px"></svg></div>
-        <div class="small" style="margin-top:8px">進捗変更時に自動記録します。保留ページは対象外です。記録開始前の履歴は復元できません。</div>
-      </div>
-      <div class="statsSectionTitle">工程ごとの残りページ</div>
-      <div class="workStatsGrid" id="workStatsGrid"></div>
+
     </div>
   </div>
 </section>
@@ -1060,49 +1033,49 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     };
   }
 
-  const WORK_ITEMS=["ネーム","下書き","線画","擬音・効果音","色塗り","テキスト","仕上げ"];
-
   function normalizeName(s){return String(s||"").toLowerCase()}
   function defaultProgress(){
-    const works={};
-    for(const name of WORK_ITEMS)works[name]={active:false,progress:0};
-    return {status:"未着手",progress:0,estimate:"",actual:"",memo:"",important:false,works};
+    return {taskVersion:1,tasks:[],status:"未着手",progress:0,estimate:"",actual:"",memo:"",important:false};
+  }
+  function taskCounts(rec,root=null){
+    const children=new Map();
+    for(const t of rec.tasks){
+      if(!children.has(t.parentId))children.set(t.parentId,[]);
+      children.get(t.parentId).push(t);
+    }
+    const stack=root?[root]:(children.get(null)||[]).slice();
+    let total=0,done=0;
+    while(stack.length){
+      const t=stack.pop(), sub=children.get(t.id);
+      if(sub?.length){for(const child of sub)stack.push(child)}
+      else {total++;if(t.done)done++}
+    }
+    return {total,done};
   }
   function calcOverallProgress(rec){
-    const total=WORK_ITEMS.reduce((sum,name)=>sum+(Number(rec.works?.[name]?.progress)||0),0);
-    return Math.round(total/WORK_ITEMS.length);
+    const {total,done}=taskCounts(rec);
+    return total?Math.round(done/total*100):0;
   }
   function migrateRecord(rec){
-    if(!rec || typeof rec!=="object")rec=defaultProgress();
-    if(!rec.works){
-      rec.works={};
-      for(const name of WORK_ITEMS)rec.works[name]={active:false,progress:0};
-      const map={"ネーム":"ネーム","下描き":"下書き","線画":"線画","仕上げ":"仕上げ"};
-      if(map[rec.status]){
-        const work=map[rec.status];
-        rec.works[work]={active:true,progress:Math.max(0,Math.min(100,Number(rec.progress)||0))};
-        rec.status="作業中";
-      }
+    if(!rec||typeof rec!=="object"||Array.isArray(rec))return defaultProgress();
+    if(rec.taskVersion!==1||!Array.isArray(rec.tasks)){
+      return {...defaultProgress(),memo:rec.memo||"",estimate:rec.estimate||"",important:!!rec.important};
     }
-    for(const name of WORK_ITEMS){
-      if(!rec.works[name])rec.works[name]={active:false,progress:0};
-      rec.works[name].active=!!rec.works[name].active;
-      rec.works[name].progress=Math.max(0,Math.min(100,Number(rec.works[name].progress)||0));
+    const ids=new Set(), valid=[];
+    // Parents precede their children. Invalid links and duplicate IDs are discarded.
+    for(const t of rec.tasks){
+      if(!t||typeof t.id!=="string"||ids.has(t.id))continue;
+      if(t.parentId!==null&&!ids.has(t.parentId))continue;
+      ids.add(t.id);valid.push({id:t.id,parentId:t.parentId,title:String(t.title||"タスク"),done:t.done===true});
     }
-    if(!["未着手","作業中","完了","保留"].includes(rec.status))rec.status="未着手";
-    rec.progress=calcOverallProgress(rec);
+    rec.tasks=valid;
+    syncPageStatus(rec);
     return rec;
   }
   function syncPageStatus(rec){
+    const {total,done}=taskCounts(rec);
     rec.progress=calcOverallProgress(rec);
-    const anyActive=WORK_ITEMS.some(name=>rec.works[name].active);
-    const anyProgress=WORK_ITEMS.some(name=>rec.works[name].progress>0);
-    const allDone=WORK_ITEMS.every(name=>rec.works[name].progress>=100);
-    if(rec.status!=="保留"){
-      if(allDone)rec.status="完了";
-      else if(anyActive||anyProgress)rec.status="作業中";
-      else rec.status="未着手";
-    }
+    if(rec.status!=="保留")rec.status=total&&done===total?"完了":done?"作業中":"未着手";
   }
   function storageKey(){return "mangaProgress:cmc:v02:"+(project.name||"unknown")}
   function getRec(page){
@@ -1118,7 +1091,9 @@ body.thumbUiHidden .comicPage img{max-height:100%}
   }
   function currentOverallProgress(){
     const included=project.pages.filter(p=>getRec(p).status!=="保留");
-    return included.length?included.reduce((sum,p)=>sum+calcOverallProgress(getRec(p)),0)/included.length:0;
+    let total=0,done=0;
+    for(const p of included){const c=taskCounts(getRec(p));total+=c.total;done+=c.done}
+    return total?done/total*100:0;
   }
   function ensureHistoryBaseline(){
     if(!project.name||!project.pages.length||progressHistory.length)return;
@@ -1243,7 +1218,7 @@ body.thumbUiHidden .comicPage img{max-height:100%}
       if(r.status==="完了"||val>=100)done++;
       else if(r.status!=="未着手"||val>0)doing++;
     }
-    const pct=project.pages.length?Math.round(sum/project.pages.length):0;
+    const pct=Math.round(currentOverallProgress());
     $("#sumPages").textContent=project.pages.length;
     $("#sumPreview").textContent=preview;
     $("#sumDone").textContent=done;
@@ -1251,22 +1226,16 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     $("#sumPct").textContent=pct+"%";
     $("#sumBar").style.width=pct+"%";
   }
-  function selectedWorkFilters(){
-    return [...document.querySelectorAll('#workFilterBox input[type="checkbox"]:checked')]
-      .map(x=>x.value);
-  }
-
   function visiblePages(){
     const q=$("#search").value.trim().toLowerCase();
     const sf=$("#statusFilter").value;
-    const wf=selectedWorkFilters();
+
 
     return project.pages.filter(p=>{
       const r=getRec(p);
       const hit=!q||String(p.pageNo).includes(q)||p.clipName.toLowerCase().includes(q);
       const statusHit=!sf||r.status===sf;
-      const workHit=wf.length===0 || wf.some(name=>r.works?.[name]?.active);
-      return hit&&statusHit&&workHit;
+      return hit&&statusHit;
     });
   }
   function renderGrid(){
@@ -1309,9 +1278,10 @@ body.thumbUiHidden .comicPage img{max-height:100%}
         <span class="pct">${Number(r.progress)||0}%</span>
       </div>
       <div class="workChips">
-        ${WORK_ITEMS.filter(name=>r.works[name]?.active).map(name=>
-          `<span class="workChip">${esc(name)} <span class="chipPct">${Number(r.works[name].progress)||0}%</span></span>`
-        ).join("") || `<span class="workChip">作業なし</span>`}
+        ${r.tasks.filter(t=>t.parentId===null).map(t=>{
+          const c=taskCounts(r,t);
+          return `<span class="workChip">${esc(t.title)} ${c.total?Math.round(c.done/c.total*100):0}%</span>`;
+        }).join("") || `<span class="workChip">タスク未設定</span>`}
       </div>
       <div class="fileName" title="${esc(p.linkPath)}">${esc(p.clipName)}</div>`;
     card.onclick=()=>{selectedPageNo=p.pageNo;renderGrid();renderEditor()};
@@ -1365,59 +1335,62 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     $("#memoEdit").value=r.memo;
     $("#importantEdit").checked=!!r.important;
 
-    const wt=$("#workTable");
-    wt.innerHTML="";
-    for(const name of WORK_ITEMS){
-      const w=r.works[name];
-      const row=document.createElement("div");
-      row.className="workRow"+(w.active?" active":"");
-      row.innerHTML=`
-        <div class="workCheck"><input type="checkbox" ${w.active?"checked":""}></div>
-        <div class="workName">${esc(name)}</div>
-        <div class="workProgressWrap"><input type="number" min="0" max="100" step="1" value="${Number(w.progress)||0}"></div>
-        <div class="workPct">%</div>
-        <div class="workMiniBar"><div style="width:${Number(w.progress)||0}%"></div></div>
-      `;
-      const ck=row.querySelector('input[type="checkbox"]');
-      const num=row.querySelector('input[type="number"]');
-
-      ck.onchange=()=>{
-        const rec=getRec(p);
-        rec.works[name].active=ck.checked;
-        syncPageStatus(rec);
-        saveProgressWithHistory();
-        renderSummary();renderGrid();renderEditor();
-        if(!$("#statsMode").classList.contains("hidden"))buildStatistics();
+    renderTasks(p,r);
+  }
+  function commitTasks(p,rec){
+    syncPageStatus(rec);saveProgressWithHistory();renderBase();
+  }
+  function addTask(p,rec,parentId){
+    const title=prompt(parentId===null?"主題を入力（例：1コマ目）":"子タスクを入力（例：線画、背景、キャラクター1）");
+    if(!title?.trim())return;
+    const task={id:crypto.randomUUID(),parentId,title:title.trim(),done:false};
+    if(parentId===null)rec.tasks.push(task);
+    else {
+      // Insert after the parent's complete subtree to preserve sibling order.
+      let at=rec.tasks.findIndex(t=>t.id===parentId)+1;
+      const descendants=new Set([parentId]);
+      while(at<rec.tasks.length&&descendants.has(rec.tasks[at].parentId))descendants.add(rec.tasks[at++].id);
+      rec.tasks.splice(at,0,task);
+    }
+    commitTasks(p,rec);
+  }
+  function renderTasks(p,rec){
+    const wt=$("#workTable");wt.innerHTML="";
+    $("#addRootTask").onclick=()=>addTask(p,rec,null);
+    if(!rec.tasks.length)wt.innerHTML='<p class="small">主題を追加して、やることを順に登録してください。</p>';
+    const depth=new Map();
+    for(const t of rec.tasks){
+      const level=t.parentId===null?0:(depth.get(t.parentId)||0)+1;depth.set(t.id,level);
+      const c=taskCounts(rec,t), row=document.createElement("div");row.className="taskRow";
+      row.style.marginLeft=(Math.min(level,12)*16)+"px";
+      row.innerHTML=`<input type="checkbox" aria-label="${esc(t.title)}を完了" ${c.done===c.total?'checked':''}>
+        <input type="text" aria-label="タスク名" value="${esc(t.title)}">
+        <span class="small">${Math.round(c.done/c.total*100)}%</span>
+        <button type="button" data-action="add">＋ 子</button><button type="button" data-action="delete">削除</button>`;
+      const checkbox=row.querySelector('[type="checkbox"]');checkbox.indeterminate=c.done>0&&c.done<c.total;
+      checkbox.onchange=()=>{
+        const ids=new Set([t.id]);
+        for(const node of rec.tasks)if(ids.has(node.id)||ids.has(node.parentId)){ids.add(node.id);node.done=checkbox.checked}
+        commitTasks(p,rec);
       };
-      num.onchange=()=>{
-        const rec=getRec(p);
-        rec.works[name].progress=Math.max(0,Math.min(100,Number(num.value)||0));
-        if(rec.works[name].progress>0 && rec.works[name].progress<100)rec.works[name].active=true;
-        if(rec.works[name].progress>=100)rec.works[name].active=false;
-        syncPageStatus(rec);
-        saveProgressWithHistory();
-        renderSummary();renderGrid();renderEditor();
+      row.querySelector('[type="text"]').onchange=e=>{t.title=e.target.value.trim()||t.title;commitTasks(p,rec)};
+      row.querySelector('[data-action="add"]').onclick=()=>addTask(p,rec,t.id);
+      row.querySelector('[data-action="delete"]').onclick=()=>{
+        if(!confirm(`「${t.title}」と配下の子タスクを削除しますか？`))return;
+        const ids=new Set([t.id]);for(const node of rec.tasks)if(ids.has(node.parentId))ids.add(node.id);
+        rec.tasks=rec.tasks.filter(node=>!ids.has(node.id));commitTasks(p,rec);
       };
       wt.appendChild(row);
     }
   }
   function updateField(field,value){
     const p=selectedPage();if(!p)return;
-    const r=getRec(p);
-    r[field]=value;
+    const r=getRec(p);r[field]=value;
     if(field==="status"){
-      if(value==="完了"){
-        for(const name of WORK_ITEMS){
-          r.works[name].progress=100;
-          r.works[name].active=false;
-        }
-      }else if(value==="未着手"){
-        const hasProgress=WORK_ITEMS.some(name=>r.works[name].progress>0);
-        if(hasProgress)r.status="作業中";
-      }
-      r.progress=calcOverallProgress(r);
+      if(value==="完了"||value==="未着手")for(const t of r.tasks)t.done=value==="完了";
+      syncPageStatus(r);
     }
-    saveProgressWithHistory();renderSummary();renderGrid();renderEditor();
+    saveProgressWithHistory();renderBase();
   }
   function formatWorkTime(ms){
     ms=Math.max(0,Number(ms)||0);
@@ -1432,87 +1405,6 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))
   }
 
-
-  function renderHistoryChart(){
-    const svg=$("#historyChart"), metric=$("#historyMetric").value, period=$("#historyPeriod").value;
-    const history=progressHistory.filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x.date)&&Number.isFinite(Number(x.value))).sort((a,b)=>a.date.localeCompare(b.date));
-    const today=new Date();today.setHours(0,0,0,0);
-    const start=new Date(today);
-    if(period!=="all"){
-      start.setDate(today.getDate()-Number(period)+1);
-      if(history.length){
-        const first=new Date(history[0].date+"T00:00:00");
-        if(!isNaN(first)&&first>start&&first<=today)start.setTime(first.getTime());
-      }
-    }
-    else if(history.length){const d=new Date(history[0].date+"T00:00:00");if(!isNaN(d))start.setTime(d.getTime())}
-    const days=Math.min(3650,Math.max(1,Math.round((today-start)/86400000)+1));
-    const byDate=new Map(history.map(x=>[x.date,Number(x.value)]));
-    let previous=null;
-    for(const x of history){if(x.date<start.toLocaleDateString("sv-SE"))previous=Number(x.value)}
-    // The initial recorded value is a snapshot, not progress made on that day.
-    // Older histories without a baseline cannot be reconstructed precisely.
-    const firstBaseline=history.length?(Number.isFinite(Number(history[0].baseline))&&history[0].baseline!==undefined?Number(history[0].baseline):0):0;
-    const series=[];
-    for(let i=0;i<days;i++){
-      const d=new Date(start);d.setDate(start.getDate()+i);
-      const key=d.toLocaleDateString("sv-SE");
-      const found=byDate.get(key);
-      const prior=previous===null?firstBaseline:previous;
-      if(found!==undefined)previous=found;
-      series.push({date:key,value:metric==="cumulative"?previous:(found===undefined?0:prior===null?0:found-prior),known:previous!==null});
-    }
-    const W=900,H=metric==="cumulative"?480:260,L=56,R=20,T=18,B=40;
-    const values=series.map(x=>x.value).filter(x=>x!==null);
-    const low=metric==="cumulative"?0:Math.min(0,...values);
-    const high=metric==="cumulative"?100:Math.max(1,...values);
-    const x=i=>L+(W-L-R)*(series.length===1?.5:i/(series.length-1));
-    const y=v=>T+(H-T-B)*(high-v)/(high-low||1);
-    const ns="http://www.w3.org/2000/svg";
-    svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
-    svg.style.height=H+"px";
-    svg.innerHTML="";
-    const add=(tag,attrs,content)=>{
-      const el=document.createElementNS(ns,tag);
-      for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);
-      if(content!==undefined)el.textContent=content;
-      svg.appendChild(el);return el;
-    };
-    const yDivisions=metric==="cumulative"?20:4;
-    for(let i=0;i<=yDivisions;i++){
-      const v=low+(high-low)*i/yDivisions;
-      add("line",{x1:L,y1:y(v),x2:W-R,y2:y(v),stroke:"#424852","stroke-width":1});
-      add("text",{x:L-8,y:y(v)+4,fill:"#b7bdc7","font-size":12,"text-anchor":"end"},v.toFixed(metric==="cumulative"?0:1)+(metric==="cumulative"?"%":"pt"));
-    }
-    const ticks=Math.min(6,series.length);
-    for(let i=0;i<ticks;i++){
-      const idx=ticks===1?0:Math.round(i*(series.length-1)/(ticks-1));
-      add("text",{x:x(idx),y:H-12,fill:"#b7bdc7","font-size":12,"text-anchor":"middle"},series[idx].date.slice(5));
-    }
-    if(metric==="cumulative"){
-      let path="";
-      series.forEach((p,i)=>{if(p.value!==null)path+=(path?" L":"M")+x(i).toFixed(2)+" "+y(p.value).toFixed(2)});
-      if(path)add("path",{d:path,fill:"none",stroke:"#7db8ed","stroke-width":3,"stroke-linejoin":"round"});
-      // A single day's history has no line segment: show its actual data point.
-      series.forEach((p,i)=>{
-        if(p.value!==null && byDate.has(p.date)){
-          const dot=add("circle",{cx:x(i),cy:y(p.value),r:5,fill:"#7db8ed",stroke:"#ffffff","stroke-width":1.5});
-          const tip=document.createElementNS(ns,"title");
-          tip.textContent=`${p.date}: ${p.value.toFixed(2)}%`;
-          dot.appendChild(tip);
-        }
-      });
-    }else{
-      const barWidth=Math.max(1,Math.min(28,(W-L-R)/series.length*.72));
-      series.forEach((p,i)=>{
-        const zero=y(0), yy=y(p.value);
-        add("rect",{x:x(i)-barWidth/2,y:Math.min(zero,yy),width:barWidth,height:Math.max(1,Math.abs(zero-yy)),fill:p.value<0?"#db8c8c":"#7db8ed"});
-      });
-    }
-    $("#historyCaption").textContent=history.length?`${history.length}日分の記録 / 最新 ${history[history.length-1].date}`:"記録はまだありません。進捗を変更すると記録を開始します。";
-  }
-  $("#historyMetric").onchange=renderHistoryChart;
-  $("#historyPeriod").onchange=renderHistoryChart;
 
   function buildStatistics(){
     const allPages=project.pages;
@@ -1534,78 +1426,10 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     $("#statsProjectName").textContent=
       `${project.name} / 統計対象 ${total}ページ`;
 
-    let done=0,working=0,unstarted=0,sumProgress=0,totalWorkTimeMs=0;
-    for(const p of targetPages){
-      const r=getRec(p);
-      sumProgress+=Number(r.progress)||0;
-      totalWorkTimeMs+=Math.max(0,Number(p.preview?.workTimeMs)||0);
-      if(r.status==="完了" || Number(r.progress)>=100)done++;
-      else if(r.status==="作業中")working++;
-      else if(r.status==="未着手")unstarted++;
-    }
-
-    const remaining=Math.max(0,total-done);
-    const overall=total ? Math.round(sumProgress/total) : 0;
-
-    $("#stTotal").textContent=total;
-    $("#stRemaining").textContent=remaining;
-    $("#stDone").textContent=done;
-    $("#stWorking").textContent=working;
-    $("#stUnstarted").textContent=unstarted;
-    $("#stWorkTime").textContent=formatWorkTime(totalWorkTimeMs);
-    $("#stWorkTimeHours").textContent=(totalWorkTimeMs/3600000).toFixed(2)+"時間";
+    const overall=Math.round(currentOverallProgress());
     $("#stOverallPct").textContent=overall+"%";
     $("#stOverallBar").style.width=overall+"%";
-    $("#stHoldNote").textContent=
-      holdPages.length
-        ? `※ 保留 ${holdPages.length}ページは統計から除外しています。`
-        : "※ 保留ページは統計から除外されます。";
-
-    renderHistoryChart();
-    const grid=$("#workStatsGrid");
-    grid.innerHTML="";
-
-    for(const name of WORK_ITEMS){
-      let remain=0,complete=0,active=0,untouched=0,sum=0;
-
-      for(const p of targetPages){
-        const r=getRec(p);
-        const w=r.works?.[name] || {active:false,progress:0};
-        const pct=Math.max(0,Math.min(100,Number(w.progress)||0));
-        sum+=pct;
-
-        if(pct>=100)complete++;
-        else remain++;
-
-        if(w.active)active++;
-        if(pct===0)untouched++;
-      }
-
-      const avg=total ? Math.round(sum/total) : 0;
-      const card=document.createElement("div");
-      card.className="workStatCard";
-      card.innerHTML=`
-        <div class="workStatTitle">${esc(name)}</div>
-        <div class="workStatMain">
-          <div>
-            <div class="small">あと</div>
-            <div class="workStatRemain">${remain}<small> ページ</small></div>
-          </div>
-          <div style="text-align:right">
-            <div class="small">平均進捗</div>
-            <div style="font-size:20px;font-weight:800">${avg}%</div>
-          </div>
-        </div>
-        <div class="workStatRows">
-          <div class="workStatMini"><div class="k">完了</div><div class="v">${complete}ページ</div></div>
-          <div class="workStatMini"><div class="k">現在作業中</div><div class="v">${active}ページ</div></div>
-          <div class="workStatMini"><div class="k">未着手</div><div class="v">${untouched}ページ</div></div>
-          <div class="workStatMini"><div class="k">着手済み未完了</div><div class="v">${Math.max(0,remain-untouched)}ページ</div></div>
-        </div>
-        <div class="statsBar"><div style="width:${avg}%"></div></div>
-      `;
-      grid.appendChild(card);
-    }
+    $("#stHoldNote").textContent="末端タスクの完了数 ÷ 全末端タスク数。タスク未設定ページと保留ページは計算対象外です。";
   }
 
   // ページの実体はcmcNodeIdで識別。変更順は表示専用でファイルを書き換えない。
@@ -2249,13 +2073,7 @@ body.thumbUiHidden .comicPage img{max-height:100%}
   $("#statusFilter").onchange=renderGrid;
   $("#thumbSize").onchange=renderGrid;
 
-  for(const ck of document.querySelectorAll('#workFilterBox input[type="checkbox"]')){
-    ck.onchange=renderGrid;
-  }
-  $("#clearWorkFilter").onclick=()=>{
-    for(const ck of document.querySelectorAll('#workFilterBox input[type="checkbox"]'))ck.checked=false;
-    renderGrid();
-  };
+
 
   $("#statusEdit").onchange=e=>{
     const p=selectedPage();
@@ -2303,7 +2121,8 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     try{
       const d=JSON.parse(await f.text());
       if(!d.progress)throw new Error("progressデータがありません");
-      progressData=d.progress;saveProgress();
+      if(typeof d.progress!=="object"||Array.isArray(d.progress))throw new Error("progressデータが不正です");
+      progressData=Object.fromEntries(Object.entries(d.progress).map(([key,rec])=>[key,migrateRecord(rec)]));saveProgress();
       if(Array.isArray(d.history)){progressHistory=d.history;localStorage.setItem(historyKey(),JSON.stringify(progressHistory))}
       if(d.comicNotes&&typeof d.comicNotes==="object"&&!Array.isArray(d.comicNotes)){comicNotes=d.comicNotes;saveComicNotes()}
       if(Array.isArray(d.pageOrder)){customPageOrder=d.pageOrder;normalizePageOrder();savePageOrder()}
