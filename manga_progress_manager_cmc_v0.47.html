@@ -495,6 +495,8 @@ body.thumbUiHidden .comicPage img{max-height:100%}
           <button id="addFrameTasks" type="button">CLIPのコマデータから自動追加</button>
           <input id="frameClipInput" type="file" accept=".clip">
           <div id="frameTaskStatus" class="statusLine" role="status"></div>
+          <button id="exportPageCsv" type="button">OneDayTask用CSVを出力</button>
+          <div class="small">末端タスクを1行ずつ、ページ・階層・進捗付きで出力します。時刻・作業時間はOneDayTaskで設定してください。</div>
           <div class="workTable" id="workTable"></div>
         </div>
 
@@ -942,15 +944,47 @@ body.thumbUiHidden .comicPage img{max-height:100%}
   function extractFrameData(db){
     const table=readTable(db,"Layer");
     if(!table.columns.includes("ComicFrameLineMipmap"))throw new Error("このCLIPには対応するコマ枠情報がありません");
-    return table.rows.filter(r=>Number(r.LayerFolder)>0&&Number(r.ComicFrameLineMipmap)>0).map(r=>({
-      id:String(r.LayerUuid||("layer:"+r.MainId)),name:String(r.LayerName||"コマ"),layerId:Number(r.MainId)
-    })).sort((a,b)=>a.name.localeCompare(b.name,"ja",{numeric:true})||a.layerId-b.layerId);
+    if(!table.columns.includes("LayerVisibility"))throw new Error("このCLIPには表示状態の情報がありません");
+    const byId=new Map(table.rows.map(r=>[Number(r.MainId),r]));
+    const roots=readTable(db,"Canvas").rows.map(r=>Number(r.CanvasRootFolder)).filter(id=>byId.has(id));
+    if(!roots.length)throw new Error("レイヤーのルートを特定できないため、表示状態を判定できません");
+    const visibility=new Map(),seen=new Set(),stack=roots.map(id=>({id,parentVisible:true}));
+    while(stack.length){
+      const {id,parentVisible}=stack.pop(),layer=byId.get(id);
+      if(!layer||seen.has(id))continue;
+      seen.add(id);
+      // LayerVisibility is a flag field: bit 0 is the layer's own eye switch.
+      const visible=parentVisible&&(Number(layer.LayerVisibility)&1)!==0;
+      visibility.set(id,visible);
+      if(Number(layer.LayerNextIndex))stack.push({id:Number(layer.LayerNextIndex),parentVisible});
+      if(Number(layer.LayerFirstChildIndex))stack.push({id:Number(layer.LayerFirstChildIndex),parentVisible:visible});
+    }
+    const candidates=table.rows.filter(r=>Number(r.LayerFolder)>0&&Number(r.ComicFrameLineMipmap)>0);
+    const info=r=>({id:String(r.LayerUuid||("layer:"+r.MainId)),name:String(r.LayerName||"コマ"),layerId:Number(r.MainId)});
+    const frames=candidates.filter(r=>visibility.get(Number(r.MainId))===true).map(info)
+      .sort((a,b)=>a.name.localeCompare(b.name,"ja",{numeric:true})||a.layerId-b.layerId);
+    const hiddenFrameIds=candidates.filter(r=>visibility.get(Number(r.MainId))!==true).map(r=>info(r).id);
+    return {frames,hiddenFrameIds};
   }
-  function appendFrameTasks(rec,frames){
+  function appendFrameTasks(rec,frames,hiddenFrameIds=[]){
     let added=0;
+    const hidden=new Set(hiddenFrameIds),remove=new Set();
+    if(!Array.isArray(rec.hiddenFrameTasks))rec.hiddenFrameTasks=[];
+    for(const root of rec.tasks){
+      if(root.parentId!==null||!hidden.has(root.frameSourceId))continue;
+      const ids=taskSubtreeIds(rec,root.id);
+      rec.hiddenFrameTasks=rec.hiddenFrameTasks.filter(item=>item.sourceId!==root.frameSourceId);
+      rec.hiddenFrameTasks.push({sourceId:root.frameSourceId,tasks:rec.tasks.filter(t=>ids.has(t.id))});
+      for(const id of ids)remove.add(id);
+    }
+    rec.tasks=rec.tasks.filter(t=>!remove.has(t.id));
     for(const frame of frames){
       if(rec.tasks.some(t=>t.frameSourceId===frame.id))continue;
-      rec.tasks.push({id:crypto.randomUUID(),parentId:null,title:frame.name,percent:0,collapsed:false,frameSourceId:frame.id});added++;
+      const archived=rec.hiddenFrameTasks.find(item=>item.sourceId===frame.id);
+      if(archived?.tasks?.length){
+        rec.tasks.push(...archived.tasks);rec.hiddenFrameTasks=rec.hiddenFrameTasks.filter(item=>item!==archived);
+      }else rec.tasks.push({id:crypto.randomUUID(),parentId:null,title:frame.name,percent:0,collapsed:false,frameSourceId:frame.id});
+      added++;
     }
     syncPageStatus(rec);return added;
   }
@@ -974,10 +1008,10 @@ body.thumbUiHidden .comicPage img{max-height:100%}
       console.warn("CanvasWorkTime取得失敗",e);
     }
 
-    let frames=[],frameError="";
-    try{frames=extractFrameData(db)}catch(e){frameError=e.message||String(e)}
+    let frames=[],hiddenFrameIds=[],frameError="";
+    try{({frames,hiddenFrameIds}=extractFrameData(db))}catch(e){frameError=e.message||String(e)}
     return {
-      frames,frameError,
+      frames,hiddenFrameIds,frameError,
       png:blob,width:Number(r.ImageWidth)||0,height:Number(r.ImageHeight)||0,
       imageType:r.ImageType,rootPage:t.rootPage,chnkOffset,dbSize,
       workTimeMs,
@@ -1221,7 +1255,7 @@ body.thumbUiHidden .comicPage img{max-height:100%}
 
         // 実作業時間はCLIPの Canvas.CanvasWorkTime を正本とする。
         const rec=getRec(p);
-        if(p.preview.frames?.length){appendFrameTasks(rec,p.preview.frames);saveProgressWithHistory()}
+        if(!p.preview.frameError){appendFrameTasks(rec,p.preview.frames,p.preview.hiddenFrameIds);saveProgressWithHistory()}
         rec.actual=Math.round((p.preview.workTimeHours||0)*100)/100;
         saveProgress();
       }catch(e){p.previewError=e.message||String(e)}
@@ -1316,7 +1350,9 @@ body.thumbUiHidden .comicPage img{max-height:100%}
           return `<span class="workChip">${esc(t.title)} ${c.total?Math.round(c.sum/c.total):0}%</span>`;
         }).join("") || `<span class="workChip">タスク未設定</span>`}
       </div>
-      <div class="fileName" title="${esc(p.linkPath)}">${esc(p.clipName)}</div>`;
+      <div class="fileName" title="${esc(p.linkPath)}">${esc(p.clipName)}</div>
+      <button type="button" class="exportPageCsv" ${r.tasks.length?'':'disabled'} title="このページの末端タスクをOneDayTaskの一括データ登録モードで読み込めるCSVに出力">OneDayTask用CSV</button>`;
+    card.querySelector('.exportPageCsv').onclick=e=>{e.stopPropagation();exportPageTaskCsv(p)};
     card.onclick=()=>{selectedPageNo=p.pageNo;renderGrid();renderEditor()};
     return card;
   }
@@ -1324,6 +1360,23 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     const old=document.querySelector(`.pageCard[data-page-no="${p.pageNo}"]`);
     if(!old)return;
     old.replaceWith(makeCard(p));
+  }
+  function buildPageTaskCsv(p){
+    const rec=getRec(p),parents=new Set(rec.tasks.map(t=>t.parentId)),paths=new Map();
+    const rows=[["起点日","予定開始","予定終了","作業時間","タスク","同期","状態"]];
+    for(const t of rec.tasks){
+      const path=[...(paths.get(t.parentId)||[]),t.title];paths.set(t.id,path);
+      if(parents.has(t.id))continue;
+      rows.push(["今日","","","",`${project.name} / ${p.pageNo}ページ / ${path.join(" / ")}（進捗 ${t.percent}%）`,"OFF",t.percent===100?"完了":t.percent>0?"仕掛":"未着手"]);
+    }
+    return "\uFEFF"+rows.map(row=>row.map(value=>'"'+String(value).replace(/"/g,'""')+'"').join(",")).join("\r\n");
+  }
+  function exportPageTaskCsv(p){
+    if(!getRec(p).tasks.length)return;
+    const url=URL.createObjectURL(new Blob([buildPageTaskCsv(p)],{type:"text/csv;charset=utf-8;"}));
+    const link=document.createElement("a");link.href=url;
+    link.download=`${project.name.replace(/[\\/:*?"<>|]/g,"_")}_${p.pageNo}ページ_OneDayTask.csv`;
+    document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
   function selectedPage(){return project.pages.find(p=>p.pageNo===selectedPageNo)}
   function renderEditor(){
@@ -1368,7 +1421,9 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     $("#memoEdit").value=r.memo;
     $("#importantEdit").checked=!!r.important;
 
-    $("#frameTaskStatus").textContent=p.frameTaskMessage||(p.preview?.frames?.length?`${p.preview.frames.length}件のコマ枠フォルダーを検出（1フォルダー＝1主題、名前順）。`:p.preview?.frameError||"コマ枠フォルダーごとに主題を作成します。複数コマを含む1フォルダーは1件として扱います。CLIP未読込の場合はファイルを選択してください。");
+    $("#frameTaskStatus").textContent=p.frameTaskMessage||(p.preview&&!p.preview.frameError?`表示中 ${p.preview.frames.length}件、非表示 ${p.preview.hiddenFrameIds.length}件を除外（1フォルダー＝1主題、名前順）。`:p.preview?.frameError||"表示中のコマ枠フォルダーごとに主題を作成します。非表示の親フォルダー内も除外し、過去に生成したタスクは退避します（再表示で復元）。1フォルダーは1件として扱います。CLIP未読込の場合はファイルを選択してください。");
+    $("#exportPageCsv").disabled=!r.tasks.length;
+    $("#exportPageCsv").onclick=()=>exportPageTaskCsv(p);
     renderTasks(p,r);
   }
   function commitTasks(p,rec){
@@ -1394,10 +1449,10 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     const button=$("#addFrameTasks");button.disabled=true;
     try{
       const {db}=extractClipSqlite(new Uint8Array(await file.arrayBuffer()));
-      const frames=extractFrameData(db);
-      if(!frames.length){p.frameTaskMessage="コマ枠フォルダーが見つかりません。通常レイヤーに描かれた枠線や画像からはコマを判定できません。";return}
-      const rec=getRec(p),added=appendFrameTasks(rec,frames);
-      p.frameTaskMessage=`${file.name}: ${frames.length}件検出、${added}件追加（登録済み ${frames.length-added}件）。名前順で追加します。`;
+      const {frames,hiddenFrameIds}=extractFrameData(db);
+      if(!frames.length&&!hiddenFrameIds.length){p.frameTaskMessage="コマ枠フォルダーが見つかりません。通常レイヤーに描かれた枠線や画像からはコマを判定できません。";return}
+      const rec=getRec(p),added=appendFrameTasks(rec,frames,hiddenFrameIds);
+      p.frameTaskMessage=`${file.name}: ${frames.length}件検出、${added}件追加（登録済み ${frames.length-added}件）。非表示 ${hiddenFrameIds.length}件を除外。名前順で追加します。`;
       commitTasks(p,rec);
     }catch(e){p.frameTaskMessage="コマデータの読込に失敗しました: "+(e.message||String(e))}
     finally{button.disabled=false;if(selectedPage()===p)renderEditor()}
