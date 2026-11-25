@@ -496,7 +496,7 @@ body.thumbUiHidden .comicPage img{max-height:100%}
           <input id="frameClipInput" type="file" accept=".clip">
           <div id="frameTaskStatus" class="statusLine" role="status"></div>
           <button id="exportPageCsv" type="button">OneDayTask用CSVを出力</button>
-          <div class="small">末端タスクを1行ずつ、ページ・階層・進捗付きで出力します。時刻・作業時間はOneDayTaskで設定してください。</div>
+          <div class="small">末端タスクを1行ずつ、ページ・階層・進捗付きで出力します。予定開始はすべて00:00です。予定終了・作業時間はOneDayTaskで設定してください。</div>
           <div class="workTable" id="workTable"></div>
         </div>
 
@@ -1365,7 +1365,7 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     for(const t of rec.tasks){
       const path=[...(paths.get(t.parentId)||[]),t.title];paths.set(t.id,path);
       if(parents.has(t.id))continue;
-      rows.push(["今日","","","",`${project.name} / ${p.pageNo}ページ / ${path.join(" / ")}（進捗 ${t.percent}%）`,"OFF",t.percent===100?"完了":t.percent>0?"仕掛":"未着手"]);
+      rows.push(["今日","00:00","","",`${project.name} / ${p.pageNo}ページ / ${path.join(" / ")}（進捗 ${t.percent}%）`,"OFF",t.percent===100?"完了":t.percent>0?"仕掛":"未着手"]);
     }
     return "\uFEFF"+rows.map(row=>row.map(value=>'"'+String(value).replace(/"/g,'""')+'"').join(",")).join("\r\n");
   }
