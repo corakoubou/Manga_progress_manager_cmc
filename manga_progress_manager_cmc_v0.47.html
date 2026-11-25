@@ -1350,9 +1350,7 @@ body.thumbUiHidden .comicPage img{max-height:100%}
           return `<span class="workChip">${esc(t.title)} ${c.total?Math.round(c.sum/c.total):0}%</span>`;
         }).join("") || `<span class="workChip">タスク未設定</span>`}
       </div>
-      <div class="fileName" title="${esc(p.linkPath)}">${esc(p.clipName)}</div>
-      <button type="button" class="exportPageCsv" ${r.tasks.length?'':'disabled'} title="このページの末端タスクをOneDayTaskの一括データ登録モードで読み込めるCSVに出力">OneDayTask用CSV</button>`;
-    card.querySelector('.exportPageCsv').onclick=e=>{e.stopPropagation();exportPageTaskCsv(p)};
+      <div class="fileName" title="${esc(p.linkPath)}">${esc(p.clipName)}</div>`;
     card.onclick=()=>{selectedPageNo=p.pageNo;renderGrid();renderEditor()};
     return card;
   }
