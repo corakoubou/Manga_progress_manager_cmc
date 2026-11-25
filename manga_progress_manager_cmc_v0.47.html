@@ -492,6 +492,9 @@ body.thumbUiHidden .comicPage img{max-height:100%}
           <label>タスク（主題 → 詳細 → さらに詳細）</label>
           <p class="small">末端タスクの％を入力できます。親は配下の末端タスクの平均です。⋮⋮をドラッグすると同じ親の中で上下に移動できます。</p>
           <button id="addRootTask" type="button">＋ 主題を追加</button>
+          <button id="addFrameTasks" type="button">CLIPのコマデータから自動追加</button>
+          <input id="frameClipInput" type="file" accept=".clip">
+          <div id="frameTaskStatus" class="statusLine" role="status"></div>
           <div class="workTable" id="workTable"></div>
         </div>
 
@@ -936,6 +939,21 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     if(!matchAt(u8,start,SIG_SQLITE))throw new Error("SQLiteヘッダーなし");
     return {db:u8.slice(start,start+size),chnkOffset:chnk,dbSize:size};
   }
+  function extractFrameData(db){
+    const table=readTable(db,"Layer");
+    if(!table.columns.includes("ComicFrameLineMipmap"))throw new Error("このCLIPには対応するコマ枠情報がありません");
+    return table.rows.filter(r=>Number(r.LayerFolder)>0&&Number(r.ComicFrameLineMipmap)>0).map(r=>({
+      id:String(r.LayerUuid||("layer:"+r.MainId)),name:String(r.LayerName||"コマ"),layerId:Number(r.MainId)
+    })).sort((a,b)=>a.name.localeCompare(b.name,"ja",{numeric:true})||a.layerId-b.layerId);
+  }
+  function appendFrameTasks(rec,frames){
+    let added=0;
+    for(const frame of frames){
+      if(rec.tasks.some(t=>t.frameSourceId===frame.id))continue;
+      rec.tasks.push({id:crypto.randomUUID(),parentId:null,title:frame.name,percent:0,collapsed:false,frameSourceId:frame.id});added++;
+    }
+    syncPageStatus(rec);return added;
+  }
   function extractCanvasPreview(u8){
     const {db,chnkOffset,dbSize}=extractClipSqlite(u8);
 
@@ -956,7 +974,10 @@ body.thumbUiHidden .comicPage img{max-height:100%}
       console.warn("CanvasWorkTime取得失敗",e);
     }
 
+    let frames=[],frameError="";
+    try{frames=extractFrameData(db)}catch(e){frameError=e.message||String(e)}
     return {
+      frames,frameError,
       png:blob,width:Number(r.ImageWidth)||0,height:Number(r.ImageHeight)||0,
       imageType:r.ImageType,rootPage:t.rootPage,chnkOffset,dbSize,
       workTimeMs,
@@ -1200,6 +1221,7 @@ body.thumbUiHidden .comicPage img{max-height:100%}
 
         // 実作業時間はCLIPの Canvas.CanvasWorkTime を正本とする。
         const rec=getRec(p);
+        if(p.preview.frames?.length){appendFrameTasks(rec,p.preview.frames);saveProgressWithHistory()}
         rec.actual=Math.round((p.preview.workTimeHours||0)*100)/100;
         saveProgress();
       }catch(e){p.previewError=e.message||String(e)}
@@ -1346,6 +1368,7 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     $("#memoEdit").value=r.memo;
     $("#importantEdit").checked=!!r.important;
 
+    $("#frameTaskStatus").textContent=p.frameTaskMessage||(p.preview?.frames?.length?`${p.preview.frames.length}件のコマ枠フォルダーを検出（1フォルダー＝1主題、名前順）。`:p.preview?.frameError||"コマ枠フォルダーごとに主題を作成します。複数コマを含む1フォルダーは1件として扱います。CLIP未読込の場合はファイルを選択してください。");
     renderTasks(p,r);
   }
   function commitTasks(p,rec){
@@ -1366,6 +1389,26 @@ body.thumbUiHidden .comicPage img{max-height:100%}
     const input=document.querySelector(`#workTable .taskRow[data-task-id="${task.id}"] input[type="text"]`);
     if(input){input.scrollIntoView({block:"nearest",inline:"nearest"});input.focus();input.select()}
   }
+  async function addSelectedFrameTasks(file){
+    const p=selectedPage();if(!p||!file)return;
+    const button=$("#addFrameTasks");button.disabled=true;
+    try{
+      const {db}=extractClipSqlite(new Uint8Array(await file.arrayBuffer()));
+      const frames=extractFrameData(db);
+      if(!frames.length){p.frameTaskMessage="コマ枠フォルダーが見つかりません。通常レイヤーに描かれた枠線や画像からはコマを判定できません。";return}
+      const rec=getRec(p),added=appendFrameTasks(rec,frames);
+      p.frameTaskMessage=`${file.name}: ${frames.length}件検出、${added}件追加（登録済み ${frames.length-added}件）。名前順で追加します。`;
+      commitTasks(p,rec);
+    }catch(e){p.frameTaskMessage="コマデータの読込に失敗しました: "+(e.message||String(e))}
+    finally{button.disabled=false;if(selectedPage()===p)renderEditor()}
+  }
+  $("#addFrameTasks").onclick=()=>{
+    const p=selectedPage();if(!p)return;
+    if(p.file)addSelectedFrameTasks(p.file);else $("#frameClipInput").click();
+  };
+  $("#frameClipInput").onchange=async e=>{
+    const file=e.target.files[0];if(file)await addSelectedFrameTasks(file);e.target.value="";
+  };
   let draggedTask=null;
   function taskSubtreeIds(rec,id){
     const ids=new Set([id]);
