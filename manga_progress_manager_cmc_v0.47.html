@@ -395,18 +395,13 @@ body.thumbUiHidden .comicPage img{max-height:100%}
 
 .comicCanvas{position:relative;flex:0 0 auto;background:#fff;display:flex;align-items:center;justify-content:center;color:#333;overflow:hidden}
 .comicPage .comicCanvas img{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:fill}
-.comicTextBox{position:absolute;min-width:0;min-height:0;border:1px dashed #417bb5;overflow:visible}
-.comicPage .comicOverlayText{display:block;width:100%;height:100%;min-height:0;min-width:0;border:0;border-radius:0;resize:none;outline:none;background:transparent;color:#111;padding:0;line-height:1.3;white-space:pre-wrap;overflow:auto;word-break:break-word;text-shadow:0 0 2px #fff;cursor:text}
-.comicPage .comicOverlayText:focus{background:#ffffffc9;outline:1px solid #417bb5}
-.comicTextMove{position:absolute;top:-20px;left:-1px;height:19px;font-size:11px;padding:1px 6px;line-height:15px;cursor:move;touch-action:none;z-index:2}
-.comicTextResize{position:absolute;right:-1px;bottom:-1px;width:20px;height:20px;padding:0;font-size:15px;line-height:18px;cursor:nwse-resize;touch-action:none;z-index:2;background:#27547c;color:white}
-.comicTextDetails{display:flex;flex-direction:column;gap:8px;flex:none;padding-top:8px}.comicTextDetails label{text-align:left!important}.comicTextDetails input{display:block;margin-top:4px}.comicPage .comicNoteArea{overflow:auto}.textMode .comicPage{cursor:default}
+.comicPage .comicNoteArea{overflow:auto}.textMode .comicPage{cursor:default}
 body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;background:#191b1f;padding:8px;position:sticky;bottom:0;z-index:5}
 .comicReader.textMode .comicControls{flex-shrink:0;position:sticky;bottom:0;z-index:5;background:var(--panel);padding:8px}
 .thumbOnlyToolbar{flex-wrap:wrap}.thumbOnlyToolbar>button,.thumbOnlyToolbar>strong,.thumbOnlyToolbar>span{white-space:nowrap}
 
 
-#comicTextKind{width:auto;max-width:210px}.comicBubbleLayer{position:absolute;inset:0;pointer-events:none;overflow:hidden}.comicBubbleNode{position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;background:#fff;color:#111;border:2px solid #181818;border-radius:50%;pointer-events:auto;writing-mode:vertical-rl;text-orientation:mixed;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.15;overflow:visible;touch-action:none;user-select:none}.comicBubbleNode[data-shape="rectangle"]{border-radius:4px}.comicBubbleNode.editable{cursor:grab}.comicBubbleNode.selected{outline:3px solid #437ef0;outline-offset:-3px}.comicBubbleText{display:block;min-inline-size:1em;max-inline-size:100%;max-block-size:100%;overflow:hidden;white-space:pre-wrap}.comicBubbleText[contenteditable="plaintext-only"]{outline:none;user-select:text;cursor:text;caret-color:#111;overflow:auto}.comicBubbleResize{position:absolute;right:0;bottom:0;width:23px;height:23px;padding:0;border:2px solid #302600;background:#ffdb29;color:#111;cursor:nwse-resize;touch-action:none;writing-mode:horizontal-tb;z-index:3}.comicBubbleResize[hidden]{display:none}.comicBubbleDetails{display:flex;flex-direction:column;gap:8px;flex:none;padding:8px 0}.comicBubbleDetails label{text-align:left!important;display:grid;gap:4px}.comicBubbleDetails input,.comicBubbleDetails select{width:100%;min-width:0}.comicPage .comicNoteArea .comicBubbleDetails textarea{min-height:100px;height:120px;flex:none;resize:vertical}.comicNoteArea:has(.comicBubbleDetails)>textarea{flex:none;height:130px!important;min-height:80px!important}.comicBubbleDetails button{white-space:normal}
+.comicBubbleLayer{position:absolute;inset:0;pointer-events:none;overflow:hidden}.comicBubbleNode{position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;background:#fff;color:#111;border:2px solid #181818;border-radius:50%;pointer-events:auto;writing-mode:vertical-rl;text-orientation:mixed;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.15;overflow:visible;touch-action:none;user-select:none}.comicBubbleNode[data-shape="rectangle"]{border-radius:4px}.comicBubbleNode.editable{cursor:grab}.comicBubbleNode.selected{outline:3px solid #437ef0;outline-offset:-3px}.comicBubbleText{display:block;min-inline-size:1em;max-inline-size:100%;max-block-size:100%;overflow:hidden;white-space:pre-wrap}.comicBubbleText[contenteditable="plaintext-only"]{outline:none;user-select:text;cursor:text;caret-color:#111;overflow:auto}.comicBubbleResize{position:absolute;right:0;bottom:0;width:23px;height:23px;padding:0;border:2px solid #302600;background:#ffdb29;color:#111;cursor:nwse-resize;touch-action:none;writing-mode:horizontal-tb;z-index:3}.comicBubbleResize[hidden]{display:none}.comicBubbleDetails{display:flex;flex-direction:column;gap:8px;flex:none;padding:8px 0}.comicBubbleDetails label{text-align:left!important;display:grid;gap:4px}.comicBubbleDetails input,.comicBubbleDetails select{width:100%;min-width:0}.comicPage .comicNoteArea .comicBubbleDetails textarea{min-height:100px;height:120px;flex:none;resize:vertical}.comicBubbleDetails[hidden],.comicNoteArea>label[hidden],.comicNoteArea>textarea[hidden]{display:none!important}.comicNoteArea.bubbleSettingsVisible .comicBubbleDetails{flex:1;min-height:0}.comicBubbleDetails button{white-space:normal}
 </style>
 </head>
 <body>
@@ -563,8 +558,6 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
       <label>表示順 <select id="thumbOrderSource"><option value="original">CMC元順</option><option value="custom">変更した順番</option></select></label>
       <button id="comicToggle" type="button">コミックモード</button>
       <button id="comicTextToggle" type="button" aria-pressed="false" disabled>テキストモード：OFF</button>
-      <select id="comicTextKind" aria-label="テキスト表示方式"><option value="bubble">吹き出し</option><option value="legacy">従来のメモ重ね表示</option></select>
-      <datalist id="comicFontChoices"><option value="游ゴシック"><option value="游明朝"><option value="メイリオ"><option value="ＭＳ ゴシック"><option value="ＭＳ 明朝"><option value="Yu Gothic"><option value="Yu Mincho"><option value="Meiryo"><option value="BIZ UDPGothic"><option value="BIZ UDPMincho"><option value="Segoe UI"><option value="Arial"></datalist>
       <button id="exportComicNotes" type="button">コミックメモTXT出力</button>
       <button id="exportComicBundle" type="button">画像＋メモJSON出力</button>
       <button id="importComicBundle" type="button">画像＋メモJSON読込</button>
@@ -578,6 +571,7 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
         <div class="comicPage" id="comicRight" title="前のページへ"></div>
       </div>
       <div class="comicControls">
+        <button id="comicBubbleUndoGlobal" class="comicBubbleUndo" type="button" disabled>吹き出しを元に戻す</button>
         <button id="comicNext" type="button">◀ 次へ（左）</button>
         <label>ページ指定 <input id="comicPageInput" type="number" min="1" step="1"></label>
         <button id="comicGo" type="button">移動</button>
@@ -1698,9 +1692,7 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
     if(comicMode){comicSpreadIndex=0;renderComic()}else renderThumbOnly();
   };
   let comicNotes={};
-  let comicTextSettings={};
   let comicBubbles={},comicBubbleDefaults={},comicBubbleUndo=[],activeComicBubble=null,comicBubbleViews=[];
-  let comicTextKind=localStorage.getItem("mangaProgress:comicTextKind")==="legacy"?"legacy":"bubble";
   const comicBubbleFonts={gothic:'"Yu Gothic", Meiryo, "Noto Sans JP", sans-serif',mincho:'"Yu Mincho", "ＭＳ 明朝", "Noto Serif JP", serif',rounded:'"Hiragino Maru Gothic ProN", "M PLUS Rounded 1c", Meiryo, sans-serif'};
   function readComicBubble(value){
     const v=value&&typeof value==="object"?value:{};
@@ -1716,8 +1708,7 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
   function rememberComicBubbles(key){comicBubbleUndo.push({key,bubbles:getComicBubbles(key).map(b=>({...b}))});if(comicBubbleUndo.length>10)comicBubbleUndo.shift()}
   function refreshComicBubbles(details=false){for(const view of comicBubbleViews){view.paint();if(details)view.details()}document.querySelectorAll(".comicBubbleUndo").forEach(button=>button.disabled=!comicBubbleUndo.length)}
   function mountComicBubbles(canvas,noteArea,p,key){
-    if(comicTextMode&&comicTextKind==="legacy")return;
-    const editing=comicTextMode&&comicTextKind==="bubble";
+    const editing=comicTextMode;
     const layer=document.createElement("div");layer.className="comicBubbleLayer";canvas.appendChild(layer);
     const panel=document.createElement("div");panel.className="comicBubbleDetails";if(editing)noteArea.appendChild(panel);
     let nodes=new Map();
@@ -1767,9 +1758,16 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
     function details(){
       if(!editing)return;
       panel.replaceChildren();const b=current();
-      const help=document.createElement('p');help.className='small';help.textContent='画像をクリックして追加。1クリックで選択、ダブルクリックで文字編集（Enterで改行）。ドラッグで移動、右下↘で枠の大きさを変更。ページメモは別に保存します。';panel.appendChild(help);
+      const selected=!!b;
+      noteArea.classList.toggle('bubbleSettingsVisible',selected);
+      noteArea.querySelector(':scope > label').hidden=selected;
+      noteArea.querySelector(':scope > textarea').hidden=selected;
+      panel.hidden=!selected;
+      if(!selected)return;
+      const heading=document.createElement('strong');heading.textContent='吹き出し設定';panel.appendChild(heading);
+      const back=document.createElement('button');back.type='button';back.className='comicBackToMemo';back.textContent='メモに戻る（選択解除）';back.onclick=()=>{activeComicBubble=null;refreshComicBubbles(true)};panel.appendChild(back);
+      const help=document.createElement('p');help.className='small';help.textContent='画像をクリックして追加。1クリックで選択、ダブルクリックで文字編集（Enterで改行）。ドラッグで移動、右下↘で枠の大きさを変更。選択中に画像の余白をクリックするとメモに戻ります。';panel.appendChild(help);
       const undo=document.createElement('button');undo.type='button';undo.textContent='元に戻す';undo.className='comicBubbleUndo';undo.disabled=!comicBubbleUndo.length;undo.onclick=()=>{const step=comicBubbleUndo.pop();if(!step)return;comicBubbles[step.key]=step.bubbles;activeComicBubble=null;saveComicBubbles();refreshComicBubbles(true)};panel.appendChild(undo);
-      if(!b){const msg=document.createElement('div');msg.textContent='吹き出しを選択してください';panel.appendChild(msg);return}
       const content=document.createElement('textarea');content.className='comicBubbleContent';content.setAttribute('aria-label','吹き出し本文');content.value=b.text;content.placeholder='吹き出し本文';let changed=false;
       content.onfocus=()=>{changed=false};content.oninput=()=>{if(!changed){rememberComicBubbles(key);changed=true}b.text=content.value;saveComicBubbles();refreshComicBubbles()};panel.appendChild(content);
       const fields=[['shape','形', [['ellipse','楕円'],['rectangle','四角']]],['width','幅（画像に対する％）',8,90],['height','高さ（画像に対する％）',8,90],['borderWidth','枠線の太さ（px）',0,12],['padding','文字の余白（px）',0,40],['textAlign','文字の揃え方',[['start','上揃え'],['center','中央揃え'],['end','下揃え']]],['size','文字サイズ（px）',10,48],['font','フォント',[['gothic','ゴシック体'],['mincho','明朝体'],['rounded','丸ゴシック体']]]];
@@ -1784,7 +1782,8 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
       const remove=document.createElement('button');remove.type='button';remove.className='comicBubbleDelete';remove.textContent='選択した吹き出しを削除';remove.onclick=()=>{rememberComicBubbles(key);comicBubbles[key]=getComicBubbles(key).filter(item=>item!==b);activeComicBubble=null;saveComicBubbles();refreshComicBubbles(true)};panel.appendChild(remove);
     }
     if(editing)canvas.addEventListener('click',e=>{
-      if(e.target.closest('.comicBubbleNode,.comicTextBox'))return;e.stopPropagation();
+      if(e.target.closest('.comicBubbleNode'))return;e.stopPropagation();
+      if(activeComicBubble){activeComicBubble=null;refreshComicBubbles(true);return}
       const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height)return;
       rememberComicBubbles(key);const b=readComicBubble({...comicBubbleDefaults,x:(e.clientX-rect.left)/rect.width,y:(e.clientY-rect.top)/rect.height,text:''});getComicBubbles(key).push(b);activeComicBubble={key,index:getComicBubbles(key).length-1};saveComicBubbles();refreshComicBubbles(true);
     });
@@ -1794,28 +1793,9 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
   const COMIC_TEXT_MODE_KEY="mangaProgress:comicTextMode";
   let comicTextMode=localStorage.getItem(COMIC_TEXT_MODE_KEY)==="true";
   let comicCanvasObservers=[];
-  function normalizeComicTextSetting(value){
-    const v=value&&typeof value==="object"?value:{};
-    const num=(key,fallback,min,max)=>Number.isFinite(Number(v[key]))?Math.max(min,Math.min(max,Number(v[key]))):fallback;
-    const x=num("x",.12,0,.9),y=num("y",.12,0,.9);
-    return {font:typeof v.font==="string"&&v.font.trim()?v.font.trim().slice(0,120):"Yu Gothic",
-      size:num("size",48,8,300),x,y,width:num("width",.65,.1,1-x),height:num("height",.3,.08,1-y)};
-  }
-  function normalizeComicTextMap(value){
-    if(!value||typeof value!=="object"||Array.isArray(value))return {};
-    return Object.fromEntries(Object.entries(value).map(([key,v])=>[key,normalizeComicTextSetting(v)]));
-  }
-  function comicTextKey(){return storageKey()+":comicTextSettings"}
-  function saveComicTextSettings(){if(project.name)localStorage.setItem(comicTextKey(),JSON.stringify(comicTextSettings))}
-  function getComicTextSetting(key){
-    if(!comicTextSettings[key])comicTextSettings[key]=normalizeComicTextSetting(null);
-    return comicTextSettings[key];
-  }
-
   function comicNotesKey(){return storageKey()+":comicNotes"}
   function loadComicNotes(){
     try{comicNotes=JSON.parse(localStorage.getItem(comicNotesKey())||"{}")||{}}catch(e){comicNotes={}}
-    try{comicTextSettings=normalizeComicTextMap(JSON.parse(localStorage.getItem(comicTextKey())||"{}"))}catch(e){comicTextSettings={}}
     try{comicBubbles=readComicBubbleMap(JSON.parse(localStorage.getItem(comicBubblesKey())||"{}"));comicBubbleDefaults=readComicBubble(JSON.parse(localStorage.getItem(comicBubblesKey()+":defaults")||"{}"))}catch(e){comicBubbles={};comicBubbleDefaults={}}
     activeComicBubble=null;comicBubbleUndo=[];
   }
@@ -1869,7 +1849,7 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
         const p=sorted[i];btn.textContent=`WebP変換 ${i+1}/${sorted.length}`;
         const image=p.url?await imageToWebp(p.url):null;
         pages.push({pageId:p.recordingId||pageIdentity(p),originalPage:p.originalPage||p.pageNo,displayPage:i+1,
-          clipName:p.clipName||"",memo:String(comicNotes[String(p.pageNo)]||""),textSettings:getComicTextSetting(String(p.pageNo)),bubbles:getComicBubbles(String(p.pageNo)),
+          clipName:p.clipName||"",memo:String(comicNotes[String(p.pageNo)]||""),bubbles:getComicBubbles(String(p.pageNo)),
           image:image?image.data:null,width:image?.width||0,height:image?.height||0});
         if(i%3===0)await new Promise(r=>setTimeout(r,0));
       }
@@ -1894,13 +1874,12 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
           return {pageNo:i+1,cmcNodeId:i+1,progressKey:"json:"+i,recordingId:String(p.pageId||("json:"+i)),clipName:String(p.clipName||""),
             url:p.image||null,preview:null,previewError:null,file:null,originalPage:Number(p.originalPage)||i+1};
         })};
-      progressData={};progressHistory=[];comicNotes={};comicTextSettings={};comicBubbles={};comicBubbleUndo=[];activeComicBubble=null;
+      progressData={};progressHistory=[];comicNotes={};comicBubbles={};comicBubbleUndo=[];activeComicBubble=null;
       for(let i=0;i<d.pages.length;i++){
         comicNotes[String(i+1)]=String(d.pages[i].memo||"");
-        comicTextSettings[String(i+1)]=normalizeComicTextSetting(d.pages[i].textSettings);
         comicBubbles[String(i+1)]=readComicBubbles(d.pages[i].bubbles);
       }
-      saveComicNotes();saveComicTextSettings();saveComicBubbles();
+      saveComicNotes();saveComicBubbles();
       customPageOrder=project.pages.map(pageIdentity);
       $("#thumbOrderSource").value="original";
       selectedPageNo=1;comicMode=true;comicSpreadIndex=0;
@@ -1930,7 +1909,7 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
     $("#comicTextToggle").disabled=false;
     $("#comicTextToggle").textContent="テキストモード："+(comicTextMode?"ON":"OFF");
     $("#comicTextToggle").setAttribute("aria-pressed",String(comicTextMode));
-    comicBubbleViews=[];$("#comicTextKind").value=comicTextKind;$("#comicTextKind").disabled=false;
+    comicBubbleViews=[];
     const count=comicSpreadCount();
     comicSpreadIndex=Math.max(0,Math.min(Math.max(0,count-1),comicSpreadIndex));
     const pages=comicSpreadPages();
@@ -1940,7 +1919,7 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
       el.title=comicTextMode?"テキスト編集（ページ移動は下のボタン）":side==="left"?"次のページへ":"前のページへ";
       const noteArea=document.createElement("div");noteArea.className="comicNoteArea";
       for(const event of ["click","pointerdown","keydown"])noteArea.addEventListener(event,e=>e.stopPropagation());
-      const noteLabel=document.createElement("label");noteLabel.textContent=comicTextMode&&comicTextKind==="legacy"?"ページ上のテキスト内容":"ページメモ（吹き出しとは別）";
+      const noteLabel=document.createElement("label");noteLabel.textContent=comicTextMode?"ページメモ（画像クリックで吹き出し追加）":"ページメモ";
       const note=document.createElement("textarea");note.placeholder="ここにメモを入力";note.setAttribute("aria-label","メモ本文");note.disabled=!p;
       const noteKey=String(p?.pageNo??("blank:"+comicSpreadIndex+":"+side));
       note.value=comicNotes[noteKey]||"";
@@ -1955,54 +1934,12 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
         }else{const msg=document.createElement("span");msg.className="small";msg.textContent=p.previewError?"読込失敗":"No Preview";canvas.appendChild(msg)}
         imageArea.appendChild(canvas);
         const label=document.createElement("div");label.className="comicLabel";label.textContent=`${orderedPages().indexOf(p)+1}ページ`+($("#thumbOrderSource").value==="custom"?`（元${p.pageNo}P）`:"");imageArea.appendChild(label);
-        let applyTextLayout=()=>{};
         function fitCanvas(){
           if(!canvas.isConnected)return;
           const width=Math.max(1,Math.min(imageArea.clientWidth,(imageArea.clientHeight-label.offsetHeight)*ratio));
-          canvas.style.width=width+"px";canvas.style.height=width/ratio+"px";applyTextLayout();
+          canvas.style.width=width+"px";canvas.style.height=width/ratio+"px";
         }
-        if(comicTextMode&&comicTextKind==="legacy"){
-          const setting=getComicTextSetting(noteKey);
-          const controls=document.createElement("div");controls.className="comicTextDetails";
-          controls.innerHTML='<label>フォント（Windows・名前を直接入力可）<input class="comicFont" list="comicFontChoices" aria-label="フォント"></label><label>文字サイズ<input class="comicFontSize" type="number" min="8" max="300" step="0.1" aria-label="文字サイズ"></label><div class="small">Enterで改行。文字枠上の「移動」で配置、右下の↘で文字・枠のサイズを変更。ページの拡大縮小に合わせて表示されます。</div>';
-          noteArea.appendChild(controls);
-          const font=controls.querySelector('.comicFont'),size=controls.querySelector('.comicFontSize');font.value=setting.font;size.value=setting.size;
-          const box=document.createElement("div");box.className="comicTextBox";
-          const move=document.createElement("button");move.type="button";move.className="comicTextMove";move.textContent="移動";move.title="ドラッグしてテキストを移動";
-          const text=document.createElement("textarea");text.className="comicOverlayText";text.value=note.value;text.placeholder="テキストを入力";text.spellcheck=false;text.setAttribute("aria-label",`${p.pageNo}ページ上のテキスト`);
-          const resize=document.createElement("button");resize.type="button";resize.className="comicTextResize";resize.textContent="↘";resize.title="ドラッグして文字・枠のサイズを変更";resize.setAttribute("aria-label","テキストサイズを変更");
-          box.append(move,text,resize);canvas.appendChild(box);
-          for(const event of ["click","pointerdown","keydown"])box.addEventListener(event,e=>e.stopPropagation());
-          applyTextLayout=()=>{
-            box.style.left=setting.x*100+"%";box.style.top=setting.y*100+"%";box.style.width=setting.width*100+"%";box.style.height=setting.height*100+"%";
-            text.style.fontFamily=JSON.stringify(setting.font)+', "Yu Gothic", Meiryo, sans-serif';
-            text.style.fontSize=setting.size*canvas.clientWidth/1000+"px";
-            move.style.top=Math.max(-20,-setting.y*canvas.clientHeight)+"px";
-          };
-          const persist=()=>saveComicTextSettings();
-          font.oninput=()=>{setting.font=font.value.trim().slice(0,120)||"Yu Gothic";applyTextLayout();persist()};
-          size.onchange=()=>{setting.size=Math.max(8,Math.min(300,Number(size.value)||48));size.value=setting.size;applyTextLayout();persist()};
-          note.oninput=()=>{comicNotes[noteKey]=note.value;text.value=note.value;saveComicNotes()};
-          text.oninput=()=>{comicNotes[noteKey]=text.value;note.value=text.value;saveComicNotes()};
-          const bindDrag=(handle,resizing)=>{
-            handle.onpointerdown=e=>{
-              if(e.button!==0)return;e.preventDefault();e.stopPropagation();handle.setPointerCapture(e.pointerId);
-              const startX=e.clientX,startY=e.clientY,initial={...setting},rect=canvas.getBoundingClientRect();
-              const update=ev=>{
-                const dx=(ev.clientX-startX)/rect.width,dy=(ev.clientY-startY)/rect.height;
-                if(resizing){
-                  const desired=Math.max((initial.width+dx)/initial.width,(initial.height+dy)/initial.height);
-                  const scale=Math.max(Math.max(.1/initial.width,.08/initial.height,8/initial.size),Math.min(desired,(1-initial.x)/initial.width,(1-initial.y)/initial.height,300/initial.size));
-                  setting.width=initial.width*scale;setting.height=initial.height*scale;setting.size=Math.round(initial.size*scale*10)/10;size.value=setting.size;
-                }else{setting.x=Math.max(0,Math.min(1-setting.width,initial.x+dx));setting.y=Math.max(0,Math.min(1-setting.height,initial.y+dy))}
-                applyTextLayout();persist();
-              };
-              const end=()=>{handle.removeEventListener('pointermove',update);handle.removeEventListener('pointerup',end);handle.removeEventListener('pointercancel',end);persist()};
-              handle.addEventListener('pointermove',update);handle.addEventListener('pointerup',end);handle.addEventListener('pointercancel',end);
-            };
-          };
-          bindDrag(move,false);bindDrag(resize,true);applyTextLayout();
-        }else note.oninput=()=>{comicNotes[noteKey]=note.value;saveComicNotes()};
+        note.oninput=()=>{comicNotes[noteKey]=note.value;saveComicNotes()};
         mountComicBubbles(canvas,noteArea,p,noteKey);
         const observer=new ResizeObserver(fitCanvas);observer.observe(imageArea);comicCanvasObservers.push(observer);
         requestAnimationFrame(fitCanvas);
@@ -2013,6 +1950,8 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
     $("#comicPageInput").max=String(project.pages.length||1);
     $("#comicPageInput").value=right?String(orderedPages().indexOf(right)+1):"";
     $("#comicPageStatus").textContent=count?`${right?orderedPages().indexOf(right)+1:""}${left?"・"+(orderedPages().indexOf(left)+1):""} / 全${project.pages.length}ページ（${comicSpreadIndex+1}/${count}見開き）`:"作品を読み込んでください";
+    $("#comicBubbleUndoGlobal").disabled=!comicBubbleUndo.length;
+    $("#comicBubbleUndoGlobal").hidden=!comicTextMode;
     $("#comicPrev").disabled=comicSpreadIndex<=0;
     $("#comicNext").disabled=comicSpreadIndex>=count-1;
   }
@@ -2025,7 +1964,7 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
   }
   function setComicMode(on){
     comicMode=on;
-    $("#comicTextToggle").disabled=!on;$("#comicTextKind").disabled=!on;
+    $("#comicTextToggle").disabled=!on;
     $("#thumbOnlyScroller").classList.toggle("hidden",on);
     $("#comicReader").classList.toggle("hidden",!on);
     // サイズ調整は一覧・コミックの両モードで利用可能
@@ -2033,13 +1972,15 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
     if(on){const index=orderedPages().findIndex(p=>p.pageNo===selectedPageNo);comicSpreadIndex=comicSpreadForPage(Math.max(0,index));renderComic()}
     else renderThumbOnly();
   }
+  $("#comicBubbleUndoGlobal").onclick=()=>{
+    const step=comicBubbleUndo.pop();if(!step)return;comicBubbles[step.key]=step.bubbles;activeComicBubble=null;saveComicBubbles();refreshComicBubbles(true);
+  };
   $("#comicToggle").onclick=()=>setComicMode(!comicMode);
-  $("#comicTextKind").onchange=e=>{comicTextKind=e.target.value;localStorage.setItem("mangaProgress:comicTextKind",comicTextKind);activeComicBubble=null;renderComic()};
   $("#comicTextToggle").onclick=()=>{
     comicTextMode=!comicTextMode;localStorage.setItem(COMIC_TEXT_MODE_KEY,String(comicTextMode));renderComic();
   };
-  $("#comicLeft").onclick=()=>{if(!comicTextMode)comicMove(1)};
-  $("#comicRight").onclick=()=>{if(!comicTextMode)comicMove(-1)};
+  $("#comicLeft").onclick=()=>{if(!comicTextMode)comicMove(1);else{activeComicBubble=null;refreshComicBubbles(true)}};
+  $("#comicRight").onclick=()=>{if(!comicTextMode)comicMove(-1);else{activeComicBubble=null;refreshComicBubbles(true)}};
   $("#comicPrev").onclick=()=>comicMove(-1);
   $("#comicNext").onclick=()=>comicMove(1);
   $("#comicGo").onclick=comicJump;
@@ -2504,7 +2445,6 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
       progress:progressData,
       history:progressHistory,
       comicNotes:comicNotes,
-      comicTextSettings:comicTextSettings,
       comicBubbles:comicBubbles,comicBubbleDefaults:comicBubbleDefaults,
       pageOrder:customPageOrder
     };
@@ -2526,7 +2466,6 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
       if(d.comicNotes&&typeof d.comicNotes==="object"&&!Array.isArray(d.comicNotes)){comicNotes=d.comicNotes;saveComicNotes()}
       if(d.comicBubbles){comicBubbles=readComicBubbleMap(d.comicBubbles);comicBubbleUndo=[];activeComicBubble=null;saveComicBubbles()}
       if(d.comicBubbleDefaults){comicBubbleDefaults=readComicBubble(d.comicBubbleDefaults);saveComicBubbles()}
-      if(d.comicTextSettings){comicTextSettings=normalizeComicTextMap(d.comicTextSettings);saveComicTextSettings()}
       if(Array.isArray(d.pageOrder)){customPageOrder=d.pageOrder;normalizePageOrder();savePageOrder()}
       renderBase();if(comicMode)renderComic()
     }catch(err){alert("進捗JSON読込に失敗しました。\n"+err.message)}
