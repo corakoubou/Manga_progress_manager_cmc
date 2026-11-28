@@ -409,7 +409,14 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
 .comicBubbleDetails input,.comicBubbleDetails select{height:24px;padding:2px 5px;font-size:12px}
 .comicBubbleDetails>button{min-height:26px;padding:3px 5px;font-size:11px;line-height:18px}
 .comicBubbleDetails>.comicBubbleDelete{grid-column:1/-1}
-.comicReader.textMode .comicSpread{min-height:300px}
+/* テキスト編集中は見開き・設定・下部操作を閲覧領域内に収める。 */
+.comicReader.textMode{overflow:hidden;align-items:center;justify-content:center}
+.comicReader.textMode .comicSpread{width:100%;max-width:calc((var(--comic-page-width,360px) + 425px)*2);min-width:0;min-height:0;height:auto;max-height:max(300px,calc(var(--comic-page-width,360px)*1.414 + 34px));flex:1 1 0}
+.comicReader.textMode .comicPage{width:50%;min-width:0;flex:1 1 0;overflow:hidden}
+.comicReader.textMode .comicNoteArea{width:clamp(180px,50%,425px);min-width:0;max-width:50%;flex:0 0 clamp(180px,50%,425px)}
+.comicReader.textMode .comicImageArea{width:auto;min-width:0;flex:1 1 0}
+.comicReader.textMode .comicControls{position:static!important;flex:0 0 auto;max-width:100%;min-width:0;gap:6px}
+
 </style>
 </head>
 <body>
@@ -1773,18 +1780,18 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
       panel.hidden=!selected;
       if(!selected)return;
       const heading=document.createElement('strong');heading.textContent='吹き出し設定';heading.title='本文は吹き出しをダブルクリックして直接編集できます（Enterで改行）。';panel.appendChild(heading);
-      const back=document.createElement('button');back.type='button';back.className='comicBackToMemo';back.textContent='メモに戻る（選択解除）';back.onclick=()=>{activeComicBubble=null;refreshComicBubbles(true)};panel.appendChild(back);
+      const back=document.createElement('button');back.type='button';back.className='comicBackToMemo';back.textContent='メモに戻る';back.title='吹き出しの選択を解除してメモを表示';back.onclick=()=>{activeComicBubble=null;refreshComicBubbles(true)};panel.appendChild(back);
       const undo=document.createElement('button');undo.type='button';undo.textContent='元に戻す';undo.className='comicBubbleUndo';undo.disabled=!comicBubbleUndo.length;undo.onclick=()=>{const step=comicBubbleUndo.pop();if(!step)return;comicBubbles[step.key]=step.bubbles;activeComicBubble=null;saveComicBubbles();refreshComicBubbles(true)};
       const fields=[['shape','形', [['ellipse','楕円'],['rectangle','四角']]],['width','幅（画像に対する％）',8,90],['height','高さ（画像に対する％）',8,90],['borderWidth','枠線の太さ（px）',0,12],['padding','文字の余白（px）',0,40],['textAlign','文字の揃え方',[['start','上揃え'],['center','中央揃え'],['end','下揃え']]],['size','文字サイズ（px）',10,48],['font','フォント',[['gothic','ゴシック体'],['mincho','明朝体'],['rounded','丸ゴシック体']]]];
       for(const [field,title,options,max] of fields){
-        const label=document.createElement('label');label.textContent=title;let input;
+        const label=document.createElement('label');label.textContent=({width:'幅（％）',height:'高さ（％）',borderWidth:'枠線（px）',padding:'余白（px）',textAlign:'文字揃え',size:'文字（px）'})[field]||title;label.title=title;let input;
         if(Array.isArray(options)){input=document.createElement('select');for(const [value,name] of options){const option=document.createElement('option');option.value=value;option.textContent=name;input.appendChild(option)}}
         else{input=document.createElement('input');input.type='number';input.min=options;input.max=max;input.step=field==='width'||field==='height'?'.01':'1'}
         input.setAttribute('aria-label',title);input.dataset.bubbleField=field;input.value=b[field];
         input.onchange=()=>{const value=Array.isArray(options)?input.value:Math.max(options,Math.min(max,Number(input.value)||0));if(value===b[field])return;rememberComicBubbles(key);b[field]=value;b.x=Math.max(b.width/200,Math.min(1-b.width/200,b.x));b.y=Math.max(b.height/200,Math.min(1-b.height/200,b.y));input.value=b[field];saveComicBubbles();refreshComicBubbles()};label.appendChild(input);panel.appendChild(label);
       }
       panel.appendChild(undo);
-      const defaults=document.createElement('button');defaults.type='button';defaults.textContent='次の吹き出しの初期値に登録';defaults.onclick=()=>{comicBubbleDefaults={...b,text:'',x:.5,y:.5};saveComicBubbles();defaults.textContent='次の吹き出しに適用します'};panel.appendChild(defaults);
+      const defaults=document.createElement('button');defaults.type='button';defaults.textContent='初期値に登録';defaults.title='次の吹き出しの初期値に登録';defaults.onclick=()=>{comicBubbleDefaults={...b,text:'',x:.5,y:.5};saveComicBubbles();defaults.textContent='登録しました'};panel.appendChild(defaults);
       const remove=document.createElement('button');remove.type='button';remove.className='comicBubbleDelete';remove.textContent='選択した吹き出しを削除';remove.onclick=()=>{rememberComicBubbles(key);comicBubbles[key]=getComicBubbles(key).filter(item=>item!==b);activeComicBubble=null;saveComicBubbles();refreshComicBubbles(true)};panel.appendChild(remove);
     }
     if(editing)canvas.addEventListener('click',e=>{
@@ -1912,6 +1919,7 @@ body.thumbUiHidden .comicReader.textMode .comicControls{display:flex!important;b
     $("#comicToggle").textContent="一覧に戻る";
     for(const observer of comicCanvasObservers)observer.disconnect();comicCanvasObservers=[];
     const reader=$("#comicReader");reader.classList.toggle("textMode",comicTextMode);
+    if(comicTextMode){reader.scrollLeft=0;reader.scrollTop=0}
     $("#comicTextToggle").disabled=false;
     $("#comicTextToggle").textContent="テキストモード："+(comicTextMode?"ON":"OFF");
     $("#comicTextToggle").setAttribute("aria-pressed",String(comicTextMode));
